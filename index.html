@@ -1,1 +1,72 @@
+<header>
+  <nav class="navbar">
+    <h1 class="logo"><a href="/">My GitHub Site</a></h1>
+    <ul class="nav-links">
+      <li><a href="/">Home</a></li>
+      <li><a href="/about.html">About</a></li>
+      <li><a href="/projects.html">Projects</a></li>
+      <li><a href="/contact.html">Contact</a></li>
+    </ul>
+  </nav>
+</header>
+
+<style>
+  body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+  }
+
+  header {
+    background-color: #0d1117;
+    color: #f0f6fc;
+    padding: 1rem 2rem;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  }
+
+  .navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
+  .logo a {
+    color: #58a6ff;
+    text-decoration: none;
+    font-size: 1.5rem;
+    font-weight: bold;
+  }
+
+  .nav-links {
+    list-style: none;
+    display: flex;
+    gap: 1.5rem;
+    margin: 0;
+    padding: 0;
+  }
+
+  .nav-links a {
+    color: #c9d1d9;
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .nav-links a:hover {
+    color: #58a6ff;
+  }
+
+  /* Mobile-friendly */
+  @media (max-width: 600px) {
+    .navbar {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .nav-links {
+      flex-direction: column;
+      width: 100%;
+      padding-top: 0.5rem;
+    }
+  }
+</style>
 
