@@ -1,74 +1,64 @@
-<header>
-  <nav class="navbar">
-    <h1 class="logo"><a href="/">Rice Accessibility</a></h1>
-    <!--
-    <ul class="nav-links">
-      <li><a href="/">Home</a></li>
-      <li><a href="/about.html">About</a></li>
-      <li><a href="/projects.html">Projects</a></li>
-      <li><a href="/contact.html">Contact</a></li>
-    </ul>
-    -->
-  </nav>
-</header>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Rice Accessibility</title>
+<link rel="stylesheet" href="style.css">
+</head>
 
-<style>
-  body {
-    margin: 0;
-    font-family: system-ui, sans-serif;
-  }
+<body>
 
-  header {
-    background-color: #0d1117;
-    color: #f0f6fc;
-    padding: 1rem 2rem;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-  }
+<h2>Rice Accessibility</h2>
 
-  .navbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    max-width: 1000px;
-    margin: 0 auto;
-  }
+<!-- TWO-COLUMN MENU WITH DIVIDER -->
+<div class="menu-split">
 
-  .logo a {
-    color: #58a6ff;
-    text-decoration: none;
-    font-size: 1.5rem;
-    font-weight: bold;
-  }
-/*
-  .nav-links {
-    list-style: none;
-    display: flex;
-    gap: 1.5rem;
-    margin: 0;
-    padding: 0;
-  }
+  <!-- LEFT COLUMN: YEARS -->
+  <div class="menu-column">
+    <div class="item active" data-target="section1">2010</div>
+    <div class="item" data-target="section2">2015</div>
+    <div class="item" data-target="section3">2020</div>
+  </div>
 
-  .nav-links a {
-    color: #c9d1d9;
-    text-decoration: none;
-    font-weight: 500;
-  }
+  <!-- RIGHT COLUMN: OTHER ITEMS -->
+  <div class="menu-column">
+    <div class="item" data-target="section4">World Pop</div>
+    <div class="item" data-target="section5">Rice Harvest</div>
+    <div class="item" data-target="section6">World GDP</div>
+    <div class="item" data-target="section7">Rice Consumption</div>
+  </div>
 
-  .nav-links a:hover {
-    color: #58a6ff;
-  }
-*/
-  /* Mobile-friendly */
-  @media (max-width: 600px) {
-    .navbar {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    .nav-links {
-      flex-direction: column;
-      width: 100%;
-      padding-top: 0.5rem;
-    }
-  }
-</style>
+</div>
 
+<!-- CONTENT SECTIONS -->
+<div id="section1" class="content">This is the Overview section.</div>
+<div id="section2" class="content">Here is the Data section.</div>
+<div id="section3" class="content">Visualization area goes here.</div>
+<div id="section4" class="content">World population data goes here.</div>
+<div id="section5" class="content">Rice harvest information.</div>
+<div id="section6" class="content">GDP data area.</div>
+<div id="section7" class="content">Rice consumption trends.</div>
+
+<!-- SCRIPT FOR CLICK HANDLING -->
+<script>
+  const items = document.querySelectorAll('.item');
+  const sections = document.querySelectorAll('.content');
+
+  items.forEach(item => {
+    item.addEventListener('click', () => {
+      // remove active highlight from all
+      items.forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+
+      // hide all content boxes
+      sections.forEach(sec => sec.style.display = 'none');
+
+      // show clicked content
+      const target = document.getElementById(item.dataset.target);
+      if (target) target.style.display = 'block';
+    });
+  });
+</script>
+
+</body>
+</html>

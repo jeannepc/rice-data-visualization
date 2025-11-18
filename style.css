@@ -1,0 +1,70 @@
+body {
+  font-family: Arial, sans-serif;
+  background: #0f172a;
+  color: white;
+  padding: 40px;
+}
+
+/* Two-column menu layout */
+.menu-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: start;
+  margin-top: 20px;
+  position: relative;
+}
+
+/* Vertical divider */
+.menu-split::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #334155;
+  transform: translateX(-1px);
+}
+
+/* Menu columns */
+.menu-column {
+  display: flex;
+  flex-direction: row;  /* <-- side-by-side */
+  flex-wrap: wrap;      /* allows wrapping if needed */
+  gap: 12px;
+}
+
+/* Clickable rectangles */
+.item {
+  padding: 14px 20px;
+  background: #1e293b;
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+  transition: 0.2s;
+  border: 2px solid transparent;
+}
+
+.item:hover {
+  background: #334155;
+}
+
+.item.active {
+  background: #3b82f6;
+  border-color: #60a5fa;
+  font-weight: bold;
+}
+
+/* Content boxes */
+.content {
+  margin-top: 30px;
+  padding: 20px;
+  background: #1e293b;
+  border-radius: 10px;
+  display: none;
+}
+
+.content:first-of-type {
+  display: block;
+}
