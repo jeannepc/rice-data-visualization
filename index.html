@@ -1,9 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
-<title>Rice Accessibility</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <title>Rice Accessibility</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- D3 (optional, used later for charts) -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 
 <body>
@@ -11,100 +16,49 @@
 <h2>Rice Accessibility</h2>
 
 <!-- TWO-COLUMN MENU WITH DIVIDER -->
-<div class="menu-content-split">
+<!-- TOP MENU -->
+<div class="top-menu">
 
-  <!-- LEFT COLUMN -->
-  <div class="menu-left">
-    <!-- LEFT MENU -->
-    <div class="menu-column">
-      <div class="item_left active" data-target="year2010">2010</div>
-      <div class="item_left" data-target="year2015">2015</div>
-      <div class="item_left" data-target="year2020">2020</div>
-    </div>
-    <!-- LEFT CONTENT -->
-    <div id="year2010" class="content left_content">2010 Overview</div>
-    <div id="year2015" class="content left_content">2015 Overview</div>
-    <div id="year2020" class="content left_content">2020 Overview</div>
+  <!-- YEARS MENU -->
+  <div class="menu-column" id="yearMenu">
+    <div class="menu-item active" data-year="2010">2010</div>
+    <div class="menu-item" data-year="2015">2015</div>
+    <div class="menu-item" data-year="2020">2020</div>
   </div>
 
-  <!-- RIGHT COLUMN -->
-  <div class="menu-right">
-    <!-- RIGHT MENU -->
-    <div class="menu-column">
-      <div class="item_right active" data-target="world_pop">World Pop</div>
-      <div class="item_right" data-target="rice_harvest">Rice Harvest</div>
-      <div class="item_right" data-target="world_gdp">World GDP</div>
-      <div class="item_right" data-target="rice_consumption">Rice Consumption</div>
-    </div>
-    <!-- RIGHT CONTENT (changes based on left + right) -->
-    <div id="year2010_world_pop" class="content right_content">2010 - World Pop</div>
-    <div id="year2010_rice_harvest" class="content right_content">2010 - Rice Harvest</div>
-    <div id="year2010_world_gdp" class="content right_content">2010 - World GDP</div>
-    <div id="year2010_rice_consumption" class="content right_content">2010 - Rice Consumption</div>
-
-    <div id="year2015_world_pop" class="content right_content">2015 - World Pop</div>
-    <div id="year2015_rice_harvest" class="content right_content">2015 - Rice Harvest</div>
-    <div id="year2015_world_gdp" class="content right_content">2015 - World GDP</div>
-    <div id="year2015_rice_consumption" class="content right_content">2015 - Rice Consumption</div>
-
-    <div id="year2020_world_pop" class="content right_content">2020 - World Pop</div>
-    <div id="year2020_rice_harvest" class="content right_content">2020 - Rice Harvest</div>
-    <div id="year2020_world_gdp" class="content right_content">2020 - World GDP</div>
-    <div id="year2020_rice_consumption" class="content right_content">2020 - Rice Consumption</div>
+  <!-- CATEGORY MENU -->
+  <div class="menu-column" id="categoryMenu">
+    <div class="menu-item active" data-type="world_pop">World Pop</div>
+    <div class="menu-item" data-type="rice_harvest">Rice Harvest</div>
+    <div class="menu-item" data-type="world_gdp">World GDP</div>
+    <div class="menu-item" data-type="rice_consumption">Rice Consumption</div>
   </div>
 
 </div>
 
+<!-- MAIN CONTENT AREA -->
+<div class="content-row">
+  <div class="left-panel" id="leftPanel">
+    Heatmap for 2010 – World Pop
+  </div>
+  <div class="right-panel" id="rightPanel">
+    Bar chart for 2010 – World Pop
+  </div>
+</div>
 
 
-<!-- SCRIPT FOR CLICK HANDLING -->
-<script>
-let currentYear = document.querySelector('.item_left.active').dataset.target;
-let currentCategory = document.querySelector('.item_right.active').dataset.target;
 
-const items_left = document.querySelectorAll('.item_left');
-const items_right = document.querySelectorAll('.item_right');
+<!-- COUNTRY FLAGS -->
+<div class="flag-bar">
+  <div class="country active" data-country="usa">USA</div>
+  <div class="country" data-country="japan">Japan</div>
+  <div class="country" data-country="sri_lanka">Sri Lanka</div>
+  <div class="country" data-country="brazil">Brazil</div>
+  <!-- add up to 20 -->
+</div>
 
-function updateLeftContent() {
-  document.querySelectorAll('.left_content').forEach(c => {
-    c.style.display = (c.id === currentYear) ? 'block' : 'none';
-  });
-}
-
-function updateRightContent() {
-  document.querySelectorAll('.right_content').forEach(c => {
-    c.style.display = (c.id === `${currentYear}_${currentCategory}`) ? 'block' : 'none';
-  });
-}
-
-// LEFT items click
-items_left.forEach(item => {
-  item.addEventListener('click', () => {
-    items_left.forEach(i => i.classList.remove('active'));
-    item.classList.add('active');
-    currentYear = item.dataset.target;
-    updateLeftContent();
-    updateRightContent();
-  });
-});
-
-// RIGHT items click
-items_right.forEach(item => {
-  item.addEventListener('click', () => {
-    items_right.forEach(i => i.classList.remove('active'));
-    item.classList.add('active');
-    currentCategory = item.dataset.target;
-    updateRightContent();
-  });
-});
-
-// Show default content on page load
-updateLeftContent();
-updateRightContent();
-
-
-</script>
-
+<!-- JS -->
+<script src="script.js"></script>
 
 </body>
 </html>
