@@ -38,17 +38,10 @@ body {
 .right-panel {
   flex: 1;
   background: #1e293b;
-  padding: 20px;
+  padding: 15px;
   border-radius: 10px;
   min-height: 250px;
-
-}
-
-.left-panel,
-.right-panel {
-  flex: 1;
-  padding: 15px;
-  border: 1px solid #eee;
+  /* border: 1px solid #eee; */
 }
 
 /* FLAGS */
