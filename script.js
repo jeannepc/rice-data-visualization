@@ -1,71 +1,25 @@
-// Current selections
-let selectedYear = "2010";
-let selectedMetric = "world_pop";
-let selectedCountry = "usa";
+// Load country list from CSV
+d3.csv("master_dataset.csv").then(function(data){
 
-// When any button changes, update both charts
-function updateDisplays() {
-  updateLeftHeatmap(selectedYear, selectedCountry);
-  updateRightBarchart(selectedYear, selectedMetric, selectedCountry);
-  updateVisibility();
-}
+  const flagBar = document.getElementById("flagBar");
 
-/* ---------------------------
-   BUTTON BEHAVIOR
----------------------------- */
+  data.forEach((row, i) => {
+    const countryName = row.Country;
+    const countryId = countryName.toLowerCase().replace(/ /g, "_");
 
-// YEAR BUTTONS
-document.querySelectorAll(".item_left").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".item_left").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    selectedYear = btn.dataset.year;
-    updateDisplays();
+    // Create a flag button
+    const div = document.createElement("div");
+    div.className = "country";
+    div.dataset.country = countryId;
+    div.textContent = countryName;
+
+    // Make the first one active by default
+    if (i === 0) div.classList.add("active");
+
+    flagBar.appendChild(div);
   });
-});
 
-// METRIC BUTTONS
-document.querySelectorAll(".item_right").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".item_right").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    selectedMetric = btn.dataset.metric;
-    updateDisplays();
-  });
-});
-
-// COUNTRY BUTTONS
-document.querySelectorAll(".country").forEach(btn => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".country").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    selectedCountry = btn.dataset.country;
-    updateDisplays();
-  });
-});
-
-/* ---------------------------
-   PLACEHOLDER D3 CHARTS
----------------------------- */
-
-function updateLeftHeatmap(year, country) {
-  d3.select("#leftViz").html("");
-  d3.select("#leftViz")
-    .append("div")
-    .style("font-size", "16px")
-    .text(`Heatmap for ${country.toUpperCase()} in ${year}`);
-}
-
-function updateRightBarchart(year, metric, country) {
-  d3.select("#rightViz").html("");
-  d3.select("#rightViz")
-    .append("div")
-    .style("font-size", "16px")
-    .text(`Bar chart: ${metric} for ${country.toUpperCase()} in ${year}`);
-}
-
-// Initial render
-updateDisplays();
+updatePanels();
 
 function updatePanels() {
   const year = document.querySelector("#yearMenu .active").dataset.year;
@@ -124,31 +78,16 @@ document.querySelectorAll('#categoryMenu .menu-item').forEach(button => {
 // Country menu listeners
 document.querySelectorAll('.country').forEach(button => {
   button.addEventListener('click', () => {
+    // Clear active class
     document.querySelectorAll('.country')
       .forEach(b => b.classList.remove('active'));
+
+    // Set active
     button.classList.add('active');
-    updatePanels();
+
+    // Trigger your updatePanels() if needed
+    if (typeof updatePanels === "function") updatePanels();
   });
 });
 
-updatePanels();
-
-function updateVisibility() {
-
-  // Hide everything first
-  document.querySelectorAll('.left_content').forEach(div => div.classList.remove('show'));
-  document.querySelectorAll('.right_content').forEach(div => div.classList.remove('show'));
-
-  // Example expected element IDs:
-  //   left_2010_usa
-  //   right_2010_world_pop_usa
-
-  const leftId  = `left_${selectedYear}_${selectedCountry}`;
-  const rightId = `right_${selectedYear}_${selectedMetric}_${selectedCountry}`;
-
-  const leftDiv  = document.getElementById(leftId);
-  const rightDiv = document.getElementById(rightId);
-
-  if (leftDiv)  leftDiv.classList.add('show');
-  if (rightDiv) rightDiv.classList.add('show');
-}
+});
