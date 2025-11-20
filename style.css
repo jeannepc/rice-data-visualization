@@ -41,7 +41,18 @@ body {
   padding: 15px;
   border-radius: 10px;
   min-height: 250px;
+  display: flex;
+  flex-direction: column;
   /* border: 1px solid #eee; */
+}
+
+.left-panel h3 {
+  margin: 0 0 10px 0;
+}
+
+.left-panel #map {
+  flex: 1;
+  z-index: 0;
 }
 
 /* FLAGS */
