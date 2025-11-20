@@ -195,11 +195,30 @@ function updateMapView(map, country, year, wmsUrl, layerName) {
   }
 }
 
-function queryWmsFeature(map, wmsUrl, layerName, latlng, containerPoint, mapSize, mapBounds) {
-  // For WMS 1.1.1, Y coordinate must be inverted because WMS uses bottom-left origin
-  // while screen coordinates use top-left origin
-  const x = Math.round(containerPoint.x);
-  const y = Math.round(mapSize.y - containerPoint.y);
+function queryWmsFeature(map, wmsUrl, layerName, latlng, countryBounds) {
+  // Use a fixed high resolution and country bounds for consistent queries across zoom levels
+  // This ensures the same geographic location always maps to the same pixel position
+  const fixedWidth = 2000;
+  const fixedHeight = 2000;
+  
+  // Use country bounds instead of current map view bounds for consistency
+  const west = countryBounds[0][1];  // min longitude
+  const south = countryBounds[0][0];  // min latitude
+  const east = countryBounds[1][1];   // max longitude
+  const north = countryBounds[1][0];  // max latitude
+  
+  const bbox = west + ',' + south + ',' + east + ',' + north;
+  
+  // Calculate the pixel position in the fixed resolution based on lat/lng
+  // Calculate pixel X based on longitude
+  const pixelX = Math.round(((latlng.lng - west) / (east - west)) * fixedWidth);
+  
+  // Calculate pixel Y based on latitude (inverted because WMS uses bottom-left origin)
+  const pixelY = Math.round(((north - latlng.lat) / (north - south)) * fixedHeight);
+  
+  // Clamp pixel coordinates to valid range
+  const x = Math.max(0, Math.min(fixedWidth - 1, pixelX));
+  const y = Math.max(0, Math.min(fixedHeight - 1, pixelY));
   
   const url = wmsUrl + '?' + 
   'SERVICE=WMS&' +
@@ -208,16 +227,16 @@ function queryWmsFeature(map, wmsUrl, layerName, latlng, containerPoint, mapSize
   'LAYERS=' + encodeURIComponent(layerName) + '&' +
   'QUERY_LAYERS=' + encodeURIComponent(layerName) + '&' +
   'STYLES=&' +
-  'BBOX=' + mapBounds + '&' +
-  'WIDTH=' + mapSize.x + '&' +
-  'HEIGHT=' + mapSize.y + '&' +
+  'BBOX=' + bbox + '&' +
+  'WIDTH=' + fixedWidth + '&' +
+  'HEIGHT=' + fixedHeight + '&' +
   'SRS=EPSG:4326&' +
   'FORMAT=image/png&' +
   'INFO_FORMAT=application/json&' +
   'X=' + x + '&' +
   'Y=' + y;
 
-  console.log('GetFeatureInfo query:', { x, y, containerPoint, mapSize, url });
+  console.log('GetFeatureInfo query:', { x, y, latlng, bbox, url });
 
   return fetch(url)
     .then(response => {
@@ -237,7 +256,7 @@ function queryWmsFeature(map, wmsUrl, layerName, latlng, containerPoint, mapSize
           const value = properties[key];
           // Skip no-data values (-9999, null, undefined, NaN)
           if (value !== null && value !== undefined && !isNaN(value) && value !== -9999 && value !== '-9999') {
-            content += `<div><b>RAI:</b> ${parseFloat(value).toFixed(2)}</div>`;
+            content += `<div><b>RAI:</b> ${parseFloat(value).toFixed(3)}</div>`;
             hasValidData = true;
           }
         }
@@ -315,18 +334,27 @@ function updatePanels() {
   const countryName = document.querySelector(".country.active").dataset.countryName;
   const wmsUrl = 'https://crcdata.soest.hawaii.edu/geoserver/ows';
   const layerName = `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year.toString()}_rai`;
+  const ssr = data.find(row => row.Country === countryName).SSR;
+  const rai_score = data.find(row => row.Country === countryName).National_RAI;
 
   // LEFT PANEL CONTENT - Keep map container, add header above it
   const leftPanel = document.getElementById("leftPanel");
   const mapContainer = document.getElementById("map");
   if (map) {
+    // Remove old click listeners to avoid duplicates
+    map.off('click');
+    
     updateMapView(map, countryName, year, wmsUrl, layerName);
-    map.on('click', (e) => {
-      const bbox = map.getBounds().toBBoxString();
-      const size = map.getSize();
-      const point = map.latLngToContainerPoint(e.latlng);
-      queryWmsFeature(map, wmsUrl, layerName, e.latlng, point, size, bbox);
-    });
+    
+    // Get country bounds for consistent queries
+    const countryConfig = countryViewConfig[countryName];
+    const countryBounds = countryConfig ? countryConfig.bounds : null;
+    
+    if (countryBounds) {
+      map.on('click', (e) => {
+        queryWmsFeature(map, wmsUrl, layerName, e.latlng, countryBounds);
+      });
+    }
   }
   // Create header if it doesn't exist
   let header = leftPanel.querySelector("h3");
@@ -334,7 +362,7 @@ function updatePanels() {
     header = document.createElement("h3");
     leftPanel.insertBefore(header, mapContainer);
   }
-  header.textContent = `Heatmap for ${countryName.toUpperCase()} – ${year}`;
+  header.textContent = `Heatmap for ${countryName.toUpperCase()} – ${year} – RAI: ${rai_score} – SSR: ${ssr}`;
 
   // If map exists, invalidate size in case container changed
   if (map) {
