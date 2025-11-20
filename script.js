@@ -292,8 +292,13 @@ d3.csv("master_dataset.csv").then(function(data){
 
   const flagBar = document.getElementById("flagBar");
 
+  const unique = new Set();
+
   data.forEach((row, i) => {
     const countryName = row.Country;
+    if (unique.has(countryName)) return;
+    unique.add(countryName);
+
     const countryId = countryName.toLowerCase().replace(/ /g, "_");
 
     // Create a flag button
@@ -304,7 +309,8 @@ d3.csv("master_dataset.csv").then(function(data){
     div.textContent = countryName;
 
     // Make the first one active by default
-    if (i === 0) div.classList.add("active");
+    //if (i === 0) div.classList.add("active");
+    if (unique.size === 1) div.classList.add("active");
 
     flagBar.appendChild(div);
   });
@@ -380,6 +386,13 @@ function updatePanels() {
   }
   document.getElementById("rightPanel").innerHTML =rightHTML;
 }
+
+// new addition --------------------------------------------------------------------------------------------------------------
+
+
+
+// end addition --------------------------------------------------------------------------------------------------------------
+
 
 
 // Year menu listeners
