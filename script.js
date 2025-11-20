@@ -145,14 +145,10 @@ const countryViewConfig = {
 
 let raiLayer = null;
 
-function updateMapView(map, country, year) {
+function updateMapView(map, country, year, wmsUrl, layerName) {
   if (map && countryViewConfig[country]) {
     const config = countryViewConfig[country];
     console.log(`Updating map view for ${country}:`, config);
-
-    // WMS layer with optimizations
-    const wmsUrl = 'https://crcdata.soest.hawaii.edu/geoserver/ows';
-    const layerName = `rice:${country.toLowerCase().replace(/ /g, "_")}_${year.toString()}_rai`;
 
     if (raiLayer) {
       map.removeLayer(raiLayer);
@@ -199,6 +195,79 @@ function updateMapView(map, country, year) {
   }
 }
 
+function queryWmsFeature(map, wmsUrl, layerName, latlng, containerPoint, mapSize, mapBounds) {
+  // For WMS 1.1.1, Y coordinate must be inverted because WMS uses bottom-left origin
+  // while screen coordinates use top-left origin
+  const x = Math.round(containerPoint.x);
+  const y = Math.round(mapSize.y - containerPoint.y);
+  
+  const url = wmsUrl + '?' + 
+  'SERVICE=WMS&' +
+  'VERSION=1.1.1&' +
+  'REQUEST=GetFeatureInfo&' +
+  'LAYERS=' + encodeURIComponent(layerName) + '&' +
+  'QUERY_LAYERS=' + encodeURIComponent(layerName) + '&' +
+  'STYLES=&' +
+  'BBOX=' + mapBounds + '&' +
+  'WIDTH=' + mapSize.x + '&' +
+  'HEIGHT=' + mapSize.y + '&' +
+  'SRS=EPSG:4326&' +
+  'FORMAT=image/png&' +
+  'INFO_FORMAT=application/json&' +
+  'X=' + x + '&' +
+  'Y=' + y;
+
+  console.log('GetFeatureInfo query:', { x, y, containerPoint, mapSize, url });
+
+  return fetch(url)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then(data => {
+      console.log('WMS GetFeatureInfo response:', data);
+      if (data.features && data.features.length > 0) {
+        const properties = data.features[0].properties;
+        let content = '<div style="font-size: 12px;">';
+        let hasValidData = false;
+        
+        for (let key in properties) {
+          const value = properties[key];
+          // Skip no-data values (-9999, null, undefined, NaN)
+          if (value !== null && value !== undefined && !isNaN(value) && value !== -9999 && value !== '-9999') {
+            content += `<div><b>RAI:</b> ${parseFloat(value).toFixed(2)}</div>`;
+            hasValidData = true;
+          }
+        }
+        
+        if (!hasValidData) {
+          content = '<div>No data at this location (no-data value)</div>';
+        }
+        content += '</div>';
+        
+        L.popup()
+          .setLatLng(latlng)
+          .setContent(content)
+          .openOn(map);
+      } else {
+        L.popup()
+          .setLatLng(latlng)
+          .setContent('<div>No data at this location</div>')
+          .openOn(map);
+      }
+      return data;
+    })
+    .catch(error => {
+      console.error('Error querying WMS:', error);
+      L.popup()
+        .setLatLng(latlng)
+        .setContent('<div>Error retrieving data: ' + error.message + '</div>')
+        .openOn(map);
+    });
+  }
+
 // Load country list from CSV
 d3.csv("master_dataset.csv").then(function(data){
 
@@ -244,11 +313,21 @@ function updatePanels() {
   const category = document.querySelector("#categoryMenu .active").dataset.type;
   const countryId = document.querySelector(".country.active").dataset.country;
   const countryName = document.querySelector(".country.active").dataset.countryName;
+  const wmsUrl = 'https://crcdata.soest.hawaii.edu/geoserver/ows';
+  const layerName = `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year.toString()}_rai`;
 
   // LEFT PANEL CONTENT - Keep map container, add header above it
   const leftPanel = document.getElementById("leftPanel");
   const mapContainer = document.getElementById("map");
-  updateMapView(map, countryName, year);
+  if (map) {
+    updateMapView(map, countryName, year, wmsUrl, layerName);
+    map.on('click', (e) => {
+      const bbox = map.getBounds().toBBoxString();
+      const size = map.getSize();
+      const point = map.latLngToContainerPoint(e.latlng);
+      queryWmsFeature(map, wmsUrl, layerName, e.latlng, point, size, bbox);
+    });
+  }
   // Create header if it doesn't exist
   let header = leftPanel.querySelector("h3");
   if (!header) {
