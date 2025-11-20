@@ -143,10 +143,36 @@ const countryViewConfig = {
   }
 };
 
-function updateMapView(map, country) {
+let raiLayer = null;
+
+function updateMapView(map, country, year) {
   if (map && countryViewConfig[country]) {
     const config = countryViewConfig[country];
     console.log(`Updating map view for ${country}:`, config);
+
+    // WMS layer with optimizations
+    const wmsUrl = 'https://crcdata.soest.hawaii.edu/geoserver/ows';
+    const layerName = `rice:${country.toLowerCase().replace(/ /g, "_")}_${year.toString()}_rai`;
+
+    if (raiLayer) {
+      map.removeLayer(raiLayer);
+    }
+
+    // Add RAI overlay from wms server
+    raiLayer = L.tileLayer.wms(wmsUrl, {
+      layers: layerName,
+      format: 'image/png',
+      transparent: true,
+      version: '1.3.0',
+      
+      // Performance & quality improvements
+      tileSize: 512,          // Larger tiles = fewer tile lines
+      detectRetina: true,     // Better quality on retina displays
+      updateWhenIdle: true,   // Less flickering
+      keepBuffer: 2,          // Keep tiles in memory
+      zIndex: 1000,           // Ensure it's on top of other layers (default is 400)
+      attribution: 'Rice Area Index Data'
+    }).addTo(map);
     
     // Set zoom restrictions for this country
     map.setMinZoom(config.minZoom);
@@ -169,7 +195,7 @@ function updateMapView(map, country) {
       map.setZoom(config.maxZoom);
     }
   } else {
-    console.log(`Map view update failed - map: ${!!map}, country: ${country}, config exists: ${!!countryViewConfig[country]}`);
+    console.log(`Map view update failed - map: ${!!map}, country: ${country}, year: ${year}, config exists: ${!!countryViewConfig[country]}`);
   }
 }
 
@@ -203,8 +229,11 @@ d3.csv("master_dataset.csv").then(function(data){
       maxZoom: 18,
       maxBounds: null // No initial bounds restriction
     }).setView([20, 0], 2);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
+    // CartoDB Positron - clean, minimal basemap without labels, perfect for raster overlays
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19
     }).addTo(map);
   }
 
@@ -219,7 +248,7 @@ function updatePanels() {
   // LEFT PANEL CONTENT - Keep map container, add header above it
   const leftPanel = document.getElementById("leftPanel");
   const mapContainer = document.getElementById("map");
-  updateMapView(map, countryName);
+  updateMapView(map, countryName, year);
   // Create header if it doesn't exist
   let header = leftPanel.querySelector("h3");
   if (!header) {
