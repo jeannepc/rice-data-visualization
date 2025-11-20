@@ -62,6 +62,7 @@ function updateRightBarchart(year, metric, country) {
     .append("div")
     .style("font-size", "16px")
     .text(`Bar chart: ${metric} for ${country.toUpperCase()} in ${year}`);
+    
 }
 
 // Initial render
