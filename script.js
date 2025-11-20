@@ -291,20 +291,19 @@ function queryWmsFeature(map, wmsUrl, layerName, latlng, countryBounds) {
 d3.csv("master_dataset.csv").then(function(data){
 
   const flagBar = document.getElementById("flagBar");
-
-  data.forEach((row, i) => {
-    const countryName = row.Country;
+  const countryList = Array.from(new Set(data.map(row => row.Country)));
+  countryList.forEach((countryName, index) => {
     const countryId = countryName.toLowerCase().replace(/ /g, "_");
 
     // Create a flag button
     const div = document.createElement("div");
     div.className = "country";
     div.dataset.country = countryId;
-    div.dataset.countryName = countryName; // Store the actual country name
+    div.dataset.countryName = countryName;
     div.textContent = countryName;
 
     // Make the first one active by default
-    if (i === 0) div.classList.add("active");
+    if (index === 0) div.classList.add("active");
 
     flagBar.appendChild(div);
   });
@@ -328,10 +327,20 @@ d3.csv("master_dataset.csv").then(function(data){
 updatePanels();
 
 function updatePanels() {
-  const year = document.querySelector("#yearMenu .active").dataset.year;
-  const category = document.querySelector("#categoryMenu .active").dataset.type;
-  const countryId = document.querySelector(".country.active").dataset.country;
-  const countryName = document.querySelector(".country.active").dataset.countryName;
+  const yearElement = document.querySelector("#yearMenu .active");
+  const categoryElement = document.querySelector("#categoryMenu .active");
+  const countryElement = document.querySelector(".country.active");
+  
+  // Add null checks to prevent errors
+  if (!yearElement || !categoryElement || !countryElement) {
+    console.error("Missing required elements:", { yearElement, categoryElement, countryElement });
+    return;
+  }
+  
+  const year = yearElement.dataset.year;
+  const category = categoryElement.dataset.type;
+  const countryId = countryElement.dataset.country;
+  const countryName = countryElement.dataset.countryName;
   const wmsUrl = 'https://crcdata.soest.hawaii.edu/geoserver/ows';
   const layerName = `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year.toString()}_rai`;
   const ssr = data.find(row => row.Country === countryName).SSR;
