@@ -287,8 +287,37 @@ function queryWmsFeature(map, wmsUrl, layerName, latlng, countryBounds) {
     });
   }
 
+const VARIABLE_OPTIONS = [
+  "GDP_Per_Capita_USD",
+  "National_RAI",
+  "Mean_RAI",
+  "Total_Production_tonnes_paddy",
+  "Total_Population",
+  "Per_Capita_Consumption_kg"
+];
+
+// Alterable Color palette we can work on
+const COLORS = [
+  "#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd",
+  "#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf",
+  "#393b79","#637939","#8c6d31","#843c39","#7b4173",
+  "#3182bd","#e6550d","#31a354","#756bb1","#636363"
+];
+
+let highlightedCountry = null;
+
 // Load country list from CSV
 d3.csv("master_dataset.csv").then(function(data){
+
+  // Fields to analyse for bars to see
+  data.forEach(d => {
+    d.GDP_Per_Capita_USD = +d.GDP_Per_Capita_USD;
+    d.National_RAI = +d.National_RAI;
+    d.Mean_RAI = +d.Mean_RAI;
+    d.Total_Production_tonnes_paddy = +d.Total_Production_tonnes_paddy;
+    d.Total_Population = +d.Total_Population;
+    d.Per_Capita_Consumption_kg = +d.Per_Capita_Consumption_kg;
+  });
 
   const flagBar = document.getElementById("flagBar");
 
@@ -309,7 +338,6 @@ d3.csv("master_dataset.csv").then(function(data){
     div.textContent = countryName;
 
     // Make the first one active by default
-    //if (i === 0) div.classList.add("active");
     if (unique.size === 1) div.classList.add("active");
 
     flagBar.appendChild(div);
@@ -331,103 +359,351 @@ d3.csv("master_dataset.csv").then(function(data){
     }).addTo(map);
   }
 
-updatePanels();
+  updatePanels(); // initial render
 
-function updatePanels() {
-  const year = document.querySelector("#yearMenu .active").dataset.year;
-  const category = document.querySelector("#categoryMenu .active").dataset.type;
-  const countryId = document.querySelector(".country.active").dataset.country;
-  const countryName = document.querySelector(".country.active").dataset.countryName;
-  const wmsUrl = 'https://crcdata.soest.hawaii.edu/geoserver/ows';
-  const layerName = `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year.toString()}_rai`;
-  const ssr = data.find(row => row.Country === countryName).SSR;
-  const rai_score = data.find(row => row.Country === countryName).National_RAI;
+  function updatePanels() {
+    const year = document.querySelector("#yearMenu .active").dataset.year;
+    const category = document.querySelector("#categoryMenu .active").dataset.type;
+    const countryEl = document.querySelector(".country.active");
+    const countryId = countryEl ? countryEl.dataset.country : null;
+    const countryName = countryEl ? countryEl.dataset.countryName : null;
+    const wmsUrl = 'https://crcdata.soest.hawaii.edu/geoserver/ows';
+    const layerName = countryName ? `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year.toString()}_rai` : null;
 
-  // LEFT PANEL CONTENT - Keep map container, add header above it
-  const leftPanel = document.getElementById("leftPanel");
-  const mapContainer = document.getElementById("map");
-  if (map) {
-    // Remove old click listeners to avoid duplicates
-    map.off('click');
-    
-    updateMapView(map, countryName, year, wmsUrl, layerName);
-    
-    // Get country bounds for consistent queries
-    const countryConfig = countryViewConfig[countryName];
-    const countryBounds = countryConfig ? countryConfig.bounds : null;
-    
-    if (countryBounds) {
-      map.on('click', (e) => {
-        queryWmsFeature(map, wmsUrl, layerName, e.latlng, countryBounds);
-      });
+    // Safely find SSR and rai_score (if country present in data)
+    const rowForCountry = countryName ? data.find(row => row.Country === countryName && String(row.Year) === String(year)) : null;
+    const ssr = rowForCountry ? rowForCountry.SSR : "N/A";
+    const rai_score = rowForCountry ? rowForCountry.National_RAI : "N/A";
+
+    // LEFT PANEL CONTENT - Keep map container, add header above it ------------------------------------------------------------------------------------------------------------------------------------
+    const leftPanel = document.getElementById("leftPanel");
+    const mapContainer = document.getElementById("map");
+    if (map) {
+      // Remove old click listeners to avoid duplicates
+      map.off('click');
+      
+      if (countryName) {
+        updateMapView(map, countryName, year, wmsUrl, layerName);
+      }
+      
+      // Get country bounds for consistent queries
+      const countryConfig = countryName ? countryViewConfig[countryName] : null;
+      const countryBounds = countryConfig ? countryConfig.bounds : null;
+      
+      if (countryBounds) {
+        map.on('click', (e) => {
+          queryWmsFeature(map, wmsUrl, layerName, e.latlng, countryBounds);
+        });
+      }
     }
+    // Create header if it doesn't exist
+    let header = leftPanel.querySelector("h3");
+    if (!header) {
+      header = document.createElement("h3");
+      leftPanel.insertBefore(header, mapContainer);
+    }
+    header.textContent = `Heatmap for ${countryName ? countryName.toUpperCase() : "—"} – ${year} – RAI: ${rai_score} – SSR: ${ssr}`;
+
+    // If map exists, invalidate size in case container changed
+    if (map) {
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 100);
+    }
+
+    // RIGHT PANEL CONTENT --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    let rightHTML = `<h3>Stacked dashboard — ${year}</h3>
+      <div id="barChartContainer" style="margin-top:10px;"></div>`;
+
+    document.getElementById("rightPanel").innerHTML = rightHTML;
+
+    // Initial chart render
+    renderStackedBarChart(year, data);
+
+    // apply country button listeners 
+    document.querySelectorAll('.country').forEach(button => {
+      button.onclick = () => {
+        // Clear previous 
+        document.querySelectorAll('.country').forEach(b => b.classList.remove('active'));
+        // Set active
+        button.classList.add('active');
+
+        // Highlight across all charts
+        const cname = button.dataset.countryName;
+        if (highlightedCountry === cname) {
+          // toggle off
+          highlightedCountry = null;
+        } else {
+          highlightedCountry = cname;
+        }
+        applyHighlightState();
+        
+        
+        updatePanels();
+      };
+    });
+
   }
-  // Create header if it doesn't exist
-  let header = leftPanel.querySelector("h3");
-  if (!header) {
-    header = document.createElement("h3");
-    leftPanel.insertBefore(header, mapContainer);
-  }
-  header.textContent = `Heatmap for ${countryName.toUpperCase()} – ${year} – RAI: ${rai_score} – SSR: ${ssr}`;
 
-  // If map exists, invalidate size in case container changed
-  if (map) {
-    setTimeout(() => {
-      map.invalidateSize();
-    }, 100);
-  }
-
-
-  // RIGHT PANEL CONTENT
-  let rightHTML = `<h3>Bar chart for ${countryName.toUpperCase()} – ${year} – ${category}</h3>`;
-  if (countryId === "usa" && year === "2020" && category === "world_pop") {
-    rightHTML += `<img src="images/temp_usa_heatmap.jpg" 
-                 style="width:100%; border-radius:8px; margin-top:10px;">`;
-  }
-  document.getElementById("rightPanel").innerHTML =rightHTML;
-}
-
-// new addition --------------------------------------------------------------------------------------------------------------
-
-
-
-// end addition --------------------------------------------------------------------------------------------------------------
-
-
-
-// Year menu listeners
-document.querySelectorAll('#yearMenu .menu-item').forEach(button => {
-  button.addEventListener('click', () => {
-    document.querySelectorAll('#yearMenu .menu-item')
-      .forEach(b => b.classList.remove('active'));
-    button.classList.add('active');
-    updatePanels();
+  // Year menu listeners
+  document.querySelectorAll('#yearMenu .menu-item').forEach(button => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('#yearMenu .menu-item')
+        .forEach(b => b.classList.remove('active'));
+      button.classList.add('active');
+      // clear highlight when year changes
+      highlightedCountry = null;
+      updatePanels();
+    });
   });
-});
 
-// Category menu listeners
-document.querySelectorAll('#categoryMenu .menu-item').forEach(button => {
-  button.addEventListener('click', () => {
-    document.querySelectorAll('#categoryMenu .menu-item')
-      .forEach(b => b.classList.remove('active'));
-    button.classList.add('active');
-    updatePanels();
+  // Category menu listeners
+  document.querySelectorAll('#categoryMenu .menu-item').forEach(button => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('#categoryMenu .menu-item')
+        .forEach(b => b.classList.remove('active'));
+      button.classList.add('active');
+      updatePanels();
+    });
   });
-});
 
-// Country menu listeners
-document.querySelectorAll('.country').forEach(button => {
-  button.addEventListener('click', () => {
-    // Clear active class
-    document.querySelectorAll('.country')
-      .forEach(b => b.classList.remove('active'));
+  // Helper: set or clear highlight and update flag buttons visual state
+  function applyHighlightState() {
+    const allSegs = d3.selectAll(".stack-seg");
+    if (!highlightedCountry) {
+      allSegs.attr("opacity", 1);
+      document.querySelectorAll(".country").forEach(btn => btn.style.background = "");
+      return;
+    }
+    allSegs.attr("opacity", d => d.country === highlightedCountry ? 1 : 0.15);
+    document.querySelectorAll(".country").forEach(btn => {
+      btn.style.background = (btn.dataset.countryName === highlightedCountry) ? "gold" : "";
+    });
+  }
 
-    // Set active
-    button.classList.add('active');
+  // ----------------------
+  // STACKED MULTI-ROW RENDERER
+  // ----------------------
+  function renderStackedBarChart(year, allData) {
+    const container = d3.select("#barChartContainer");
+    container.html(""); // clear previous chart
 
-    // Trigger your updatePanels() if needed
-    if (typeof updatePanels === "function") updatePanels();
-  });
-});
+    // Tooltip
+    const tooltipId = "bar-tooltip";
+    let old = document.getElementById(tooltipId);
+    if (old) old.remove();
+    const tooltip = d3.select("body")
+      .append("div")
+      .attr("id", tooltipId)
+      .style("position", "absolute")
+      .style("pointer-events", "none")
+      .style("padding", "6px 8px")
+      .style("background", "black")
+      .style("border", "1px solid #ccc")
+      .style("border-radius", "4px")
+      .style("font-size", "12px")
+      .style("opacity", 0);
 
+    // Filter rows for selected year
+    const yearRows = allData.filter(d => String(d.Year) === String(year));
+    if (yearRows.length === 0) {
+      container.append("div").text("No data for selected year.");
+      return;
+    }
+
+    // build maps
+    const countryMap = {};
+    yearRows.forEach(d => {
+      const country = d.Country;
+      countryMap[country] = {
+        Country: country,
+        GDP_Per_Capita_USD: +d.GDP_Per_Capita_USD || 0,
+        National_RAI: +d.National_RAI || 0,
+        Mean_RAI: +d.Mean_RAI || 0,
+        Total_Production_tonnes_paddy: +d.Total_Production_tonnes_paddy || 0,
+        Total_Population: +d.Total_Population || 0,
+        Per_Capita_Consumption_kg: +d.Per_Capita_Consumption_kg || 0
+      };
+    });
+
+    // Set a order to render all maps in, subject ot change based on other varibales
+    const countries = Object.values(countryMap)
+      .sort((a,b) => b.GDP_Per_Capita_USD - a.GDP_Per_Capita_USD)
+      .map(d => d.Country);
+
+    // If there are many countries, we still render them proportionally across width
+    // Chart layout
+    const margin = { top: 30, right: 20, bottom: 30, left: 140 };
+    const rowHeight = 48;
+    const rowGap = 14;
+    const rows = VARIABLE_OPTIONS.length; // 6
+    const innerWidth = Math.max(700, countries.length * 6); // minimal width or scale with countries
+    const width = innerWidth + margin.left + margin.right;
+    const height = margin.top + rows * rowHeight + (rows - 1) * rowGap + margin.bottom;
+
+    const svg = container.append("svg").attr("width", width).attr("height", height);
+
+    // For each variable compute the total so we can scale widths per row consistently
+    const rowTotals = {};
+    VARIABLE_OPTIONS.forEach(varName => {
+      rowTotals[varName] = d3.sum(countries, c => countryMap[c] ? countryMap[c][varName] : 0);
+    });
+
+    // Colors mapping for countries (consistent across rows)
+    const color = (country, i) => COLORS[i % COLORS.length];
+
+    // For each row (variable) compute x0 positions per country
+    const allSegments = []; // flattened list of segments for rendering & interactions
+
+    VARIABLE_OPTIONS.forEach((varName, rowIndex) => {
+      let x0 = 0;
+      const total = rowTotals[varName] || 1; // avoid division by zero
+
+      countries.forEach((country, i) => {
+
+        const realValue = countryMap[country] ? countryMap[country][varName] : 0;
+        const width = (realValue / total) * innerWidth;
+
+        const seg = {
+          variable: varName,
+          country: country,
+          value: realValue,
+          rowIndex,
+          x: x0,
+          width: width,
+          color: color(country, i)
+        };
+
+        allSegments.push(seg);
+
+        x0 += width;
+      });
+    });
+    // -------------------check around here for style stuff------------------------------------
+    // Render row labels and group container for segments
+    const rowGroup = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+    // Background label column
+    const labels = svg.append("g")
+      .attr("transform", `translate(${margin.left - 10},${margin.top})`);
+
+    VARIABLE_OPTIONS.forEach((varName, rowIndex) => {
+      const y = rowIndex * (rowHeight + rowGap);
+      // label background line
+      labels.append("text")
+        .attr("x", -10)
+        .attr("y", y + rowHeight / 2)
+        .attr("text-anchor", "end")
+        .attr("dominant-baseline", "middle")
+        .style("font-size", "13px")
+        .style("font-weight", "600")
+        .text(varName);
+    });
+
+    // Draw each segment as rect
+    const segs = rowGroup.selectAll("g.row")
+      .data(VARIABLE_OPTIONS.map((v, i) => ({variable: v, rowIndex: i})))
+      .join("g")
+      .attr("class", d => `row row-${d.rowIndex}`)
+      .attr("transform", d => `translate(0, ${d.rowIndex * (rowHeight + rowGap)})`)
+      .each(function(rowInfo) {
+        const rowIndex = rowInfo.rowIndex;
+        const varName = rowInfo.variable;
+        const rowSegs = allSegments.filter(s => s.variable === varName);
+        const g = d3.select(this);
+
+        g.selectAll("rect")
+          .data(rowSegs)
+          .join("rect")
+          .attr("class", "stack-seg")
+          .attr("x", d => d.x)
+          .attr("y", 0)
+          .attr("width", d => Math.max(0.5, d.width)) 
+          .attr("height", rowHeight)
+          .attr("fill", d => d.color)
+          .style("cursor", "pointer")
+          .on("mouseover", function(event, d) {
+            const raw = countryMap[d.country][d.variable];
+            const formatted = (raw === undefined || raw === null || isNaN(raw))
+              ? "N/A"
+              : raw;
+
+            // Units for each variable
+            const unitMap = {
+              GDP_Per_Capita_USD: "USD per person",
+              National_RAI: "RAI",
+              Mean_RAI: "RAI",
+              Total_Production_tonnes_paddy: "tonnes",
+              Total_Population: "people",
+              Per_Capita_Consumption_kg: "kg per person"
+            };
+
+            const unit = unitMap[d.variable] || "";
+
+            tooltip.style("opacity", 1)
+              .html(`
+                <strong>${d.country}</strong><br/>
+                ${formatted} ${unit}
+              `);
+
+            tooltip.style("left", (event.pageX + 12) + "px")
+                  .style("top", (event.pageY + 12) + "px");
+
+            if (!highlightedCountry) {
+              d3.selectAll(".stack-seg")
+                .attr("opacity", s => s.country === d.country ? 1 : 0.2);
+            }
+          })
+
+
+
+
+
+          .on("mousemove", function(event) {
+            tooltip.style("left", (event.pageX + 12) + "px").style("top", (event.pageY + 12) + "px");
+          })
+          .on("mouseout", function() {
+            tooltip.style("opacity", 0);
+            if (!highlightedCountry) {
+              d3.selectAll(".stack-seg").attr("opacity", 1);
+            } else {
+              applyHighlightState();
+            }
+          })
+          .on("click", function(event, d) {
+            // toggle highlight for the clicked country
+            if (highlightedCountry === d.country) {
+              highlightedCountry = null;
+            } else {
+              highlightedCountry = d.country;
+            }
+            // update flag visuals and apply opacities
+            applyHighlightState();
+
+            // set corresponding flag active (if present)
+            document.querySelectorAll('.country').forEach(btn => {
+              if (btn.dataset.countryName === d.country) {
+                document.querySelectorAll('.country').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+              }
+            });
+
+            // also update map / header by triggering updatePanels - this will re-render chart (but highlightedCountry stays)
+            // Use a small timeout to avoid immediate re-render wiping highlight out
+            setTimeout(() => {
+              // keep highlightedCountry stable and re-render
+              updatePanels();
+            }, 80);
+          });
+
+      });
+      
+    // Apply any persistent highlight state now
+    applyHighlightState();
+  } 
+
+}).catch(err => {
+  console.error("Error loading CSV:", err);
+  const rightPanel = document.getElementById("rightPanel");
+  if (rightPanel) rightPanel.innerHTML = "<div style='color:red;'>Failed to load master_dataset.csv</div>";
 });
