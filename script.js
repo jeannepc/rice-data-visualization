@@ -146,6 +146,7 @@ const countryViewConfig = {
 let raiLayer = null;
 
 function updateMapView(map, country, year, wmsUrl, layerName) {
+
   if (map && countryViewConfig[country]) {
     const config = countryViewConfig[country];
     console.log(`Updating map view for ${country}:`, config);
@@ -296,6 +297,15 @@ const VARIABLE_OPTIONS = [
   "Per_Capita_Consumption_kg"
 ];
 
+const VARIABLE_LABLES = {
+  GDP_Per_Capita_USD: "GDP per Capita",
+  National_RAI: "National RAI",
+  Mean_RAI: "Mean RAI",
+  Total_Production_tonnes_paddy: "Production",
+  Total_Population: "Total Population",
+  Per_Capita_Consumption_kg: "Consumption"
+}
+
 // Alterable Color palette we can work on
 const COLORS = [
   "#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd",
@@ -411,12 +421,26 @@ d3.csv("master_dataset.csv").then(function(data){
       }, 100);
     }
 
+
+
+
+
+
+
+
+
+
+
+
+
+    
     // RIGHT PANEL CONTENT --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     let rightHTML = `<h3>Stacked dashboard — ${year}</h3>
       <div id="barChartContainer" style="margin-top:10px;"></div>`;
 
     document.getElementById("rightPanel").innerHTML = rightHTML;
-
+    // const rightPanel = new RightPanel("rightPanel");
+    // rightPanel.load(StackedPage);
     // Initial chart render
     renderStackedBarChart(year, data);
 
@@ -562,7 +586,7 @@ d3.csv("master_dataset.csv").then(function(data){
       countries.forEach((country, i) => {
 
         const realValue = countryMap[country] ? countryMap[country][varName] : 0;
-        const width = (realValue / total) * innerWidth;
+        const segWidth = (realValue / total) * innerWidth;
 
         const seg = {
           variable: varName,
@@ -570,16 +594,15 @@ d3.csv("master_dataset.csv").then(function(data){
           value: realValue,
           rowIndex,
           x: x0,
-          width: width,
+          width: segWidth,
           color: color(country, i)
         };
 
         allSegments.push(seg);
 
-        x0 += width;
+        x0 += segWidth;
       });
     });
-    // -------------------check around here for style stuff------------------------------------
     // Render row labels and group container for segments
     const rowGroup = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -597,7 +620,8 @@ d3.csv("master_dataset.csv").then(function(data){
         .attr("dominant-baseline", "middle")
         .style("font-size", "13px")
         .style("font-weight", "600")
-        .text(varName);
+        .style("fill", "#ffffff")
+        .text(VARIABLE_LABLES[varName] || varName);
     });
 
     // Draw each segment as rect
@@ -646,8 +670,23 @@ d3.csv("master_dataset.csv").then(function(data){
                 ${formatted} ${unit}
               `);
 
-            tooltip.style("left", (event.pageX + 12) + "px")
-                  .style("top", (event.pageY + 12) + "px");
+            const marginRight = 10;
+            const viewportWidth = window.styleinnerWidth || 
+              document.documentElement.clientWidth;  
+
+            const tooltipWidth = tooltip.node ? tooltip.node.offsetWidth : 150;
+
+            let tx = event.pageX + 12;
+            let ty = event.pageY + 12;
+
+            if (tx + tooltipWidth + marginRight > viewportWidth)
+            {
+              tx = event.pageX - tooltipWidth - 12;
+              if (tx < 8) tx = 8;
+            }
+
+            tooltip.style("left", tx + "px")
+                  .style("top", ty + "px");
 
             if (!highlightedCountry) {
               d3.selectAll(".stack-seg")
@@ -660,8 +699,20 @@ d3.csv("master_dataset.csv").then(function(data){
 
 
           .on("mousemove", function(event) {
-            tooltip.style("left", (event.pageX + 12) + "px").style("top", (event.pageY + 12) + "px");
-          })
+          // Mirror the same flipping logic on mousemove
+          const marginRight = 10;
+          const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+          const tooltipNode = tooltip.node();
+          const tooltipWidth = tooltipNode ? tooltipNode.offsetWidth : 150;
+
+          let tx = event.pageX + 12;
+          let ty = event.pageY + 12;
+          if (tx + tooltipWidth + marginRight > viewportWidth) {
+            tx = event.pageX - tooltipWidth - 12;
+            if (tx < 8) tx = 8;
+          }
+          tooltip.style("left", tx + "px").style("top", ty + "px");
+        })
           .on("mouseout", function() {
             tooltip.style("opacity", 0);
             if (!highlightedCountry) {
