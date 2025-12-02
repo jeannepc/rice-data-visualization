@@ -366,7 +366,7 @@ function queryWmsFeature(map, wmsUrl, enabledLayers, latlng, countryBounds) {
       .then(data => ({ layerInfo, data }))
   );
 
-  Promise.all(layerQueries)
+  return Promise.all(layerQueries)
     .then(results => {
       let content = '<div style="font-size: 12px;">';
       let hasValidData = false;
@@ -564,9 +564,36 @@ d3.csv("master_dataset.csv").then(function(data){
       leftPanel.insertBefore(header, mapContainer);
     }
     const row = data.find(r => r.Country === countryName && String(r.Year) === String(year));
-    header.textContent = `Heatmap for ${
+    const raiValue = row ? row.National_RAI : "N/A";
+    const ssrValue = row ? row.SSR : "N/A";
+    
+    header.innerHTML = `Heatmap for ${
       countryName ? countryName.toUpperCase() : "—"
-    } – ${year} – RAI: ${row ? row.National_RAI : "N/A"} – SSR: ${row ? row.SSR : "N/A"}`;
+    } – ${year} – RAI: ${raiValue}%<span class="tooltip-trigger" data-tooltip="rai">ℹ️<span class="tooltip-content"><h4>Rice Accessibility Index (RAI)</h4><p>Measures whether rice produced within 50km of each location can meet local consumption needs.</p><ul><li><strong>100%</strong> = Local production meets local demand</li><li><strong>&gt;100%</strong> = Surplus production nearby</li><li><strong>&lt;100%</strong> = Insufficient local production</li></ul><p>This reveals vulnerabilities in the food system even when national production seems adequate. Urban areas often show low RAI due to geographic separation from rural production zones.</p></span></span> – SSR: ${ssrValue}%<span class="tooltip-trigger" data-tooltip="ssr">ℹ️<span class="tooltip-content"><h4>Self-Sufficiency Ratio (SSR)</h4><p>Measures whether a country's total rice production can meet its total national consumption needs.</p><ul><li><strong>100%</strong> = National production meets national demand</li><li><strong>&gt;100%</strong> = Net exporter (produces surplus)</li><li><strong>&lt;100%</strong> = Import dependent (production deficit)</li></ul><p>This shows overall national food security but doesn't reveal regional vulnerabilities or supply chain risks within the country.</p></span></span>`;
+
+    // Add click handlers for tooltips
+    header.querySelectorAll('.tooltip-trigger').forEach(trigger => {
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Close all other tooltips
+        header.querySelectorAll('.tooltip-trigger').forEach(t => {
+          if (t !== trigger) {
+            t.classList.remove('active');
+          }
+        });
+        // Toggle current tooltip
+        trigger.classList.toggle('active');
+      });
+    });
+
+    // Close tooltips when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!header.contains(e.target)) {
+        header.querySelectorAll('.tooltip-trigger').forEach(trigger => {
+          trigger.classList.remove('active');
+        });
+      }
+    });
 
     // render right panel
     if(category === "generic_data")
