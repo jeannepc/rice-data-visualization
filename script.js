@@ -149,6 +149,17 @@ const countryViewConfig = {
 };
 
 let raiLayer = null;
+let worldPopLayer = null;
+let globalRiceLayer = null;
+let positronBaseLayer = null;
+let layerControl = null;
+let legendControl = null;
+// Store layer visibility state to persist across country switches
+let layerVisibilityState = {
+  "RAI Heatmap": true,  // Default to visible
+  "Population Density": false,
+  "Rice Harvest": false
+};
 
 window.sharedState = {
   highlightedCountry: null,
@@ -159,32 +170,327 @@ window.sharedState = {
   }
 };
 
+// Function to save current layer visibility state
+function saveLayerVisibilityState() {
+  if (layerControl) {
+    // Check which layers are currently on the map
+    layerVisibilityState["RAI Heatmap"] = map.hasLayer(raiLayer);
+    layerVisibilityState["Population Density"] = map.hasLayer(worldPopLayer);
+    layerVisibilityState["Rice Harvest"] = map.hasLayer(globalRiceLayer);
+  }
+}
 
-function updateMapView(map, country, year, wmsUrl, layerName) {
+// Function to update layers when country or year changes
+function updateLayers(countryName, year, wmsUrl) {
+  // Save current visibility state before removing layers
+  saveLayerVisibilityState();
+  
+  // Remove old layers from map
+  if (raiLayer) map.removeLayer(raiLayer);
+  if (worldPopLayer) map.removeLayer(worldPopLayer);
+  if (globalRiceLayer) map.removeLayer(globalRiceLayer);
+  
+  // Remove old layer control
+  if (layerControl) {
+    map.removeControl(layerControl);
+  }
+  
+  // Remove old legend event listeners
+  map.off('overlayadd overlayremove', updateLegend);
+  
+  // Create new layer names based on current country and year
+  const riceLayerName = countryName
+    ? `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year}_rai`
+    : null;
+  const worldPopLayerName = countryName
+    ? `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year}_pop_10km_aligned`
+    : null;
+  const globalRiceLayerName = countryName
+    ? `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year}_rice_10km`
+    : null;
+  
+  // Create new layers
+  raiLayer = L.tileLayer.wms(wmsUrl, {
+    layers: riceLayerName,
+    format: "image/png",
+    transparent: true,
+    version: '1.3.0',
+    tileSize: 512,
+    detectRetina: true,
+    updateWhenIdle: true,
+    keepBuffer: 2,
+    zIndex: 1000,
+    attribution: 'Rice Area Index Data'
+  });
+  
+  worldPopLayer = L.tileLayer.wms(wmsUrl, {
+    layers: worldPopLayerName,
+    format: "image/png",
+    transparent: true,
+    version: '1.3.0',
+    tileSize: 512,
+    detectRetina: true,
+    updateWhenIdle: true,
+    keepBuffer: 2,
+    zIndex: 999,
+    attribution: 'World Population Data'
+  });
+  
+  globalRiceLayer = L.tileLayer.wms(wmsUrl, {
+    layers: globalRiceLayerName,
+    format: "image/png",
+    transparent: true,
+    version: '1.3.0',
+    tileSize: 512,
+    detectRetina: true,
+    updateWhenIdle: true,
+    keepBuffer: 2,
+    zIndex: 998,
+    attribution: 'Global Rice Data'
+  });
+  
+  // Restore visibility state by adding layers to map first
+  // This ensures the layer control reflects the correct initial state
+  if (layerVisibilityState["RAI Heatmap"]) {
+    raiLayer.addTo(map);
+  }
+  if (layerVisibilityState["Population Density"]) {
+    worldPopLayer.addTo(map);
+  }
+  if (layerVisibilityState["Rice Harvest"]) {
+    globalRiceLayer.addTo(map);
+  }
+  
+  // Create base layers object
+  const baseLayers = {
+    "Positron": positronBaseLayer
+  };
+  
+  // Create overlays object
+  const overlays = {
+    "RAI Heatmap": raiLayer,
+    "Population Density": worldPopLayer,
+    "Rice Harvest": globalRiceLayer
+  };
+  
+  // Create new layer control (it will automatically detect which layers are on the map)
+  layerControl = L.control.layers(baseLayers, overlays).addTo(map);
+  
+  // Update legend after layers are created (with small delay to ensure layers are added)
+  setTimeout(() => {
+    updateLegend();
+  }, 100);
+  
+  // Listen for layer add/remove events to update legend
+  map.on('overlayadd overlayremove', () => {
+    setTimeout(() => {
+      updateLegend();
+    }, 50);
+  });
+  
+  // Return layer information for querying
+  return {
+    rai: { name: riceLayerName, type: 'RAI', layer: raiLayer },
+    worldPop: { name: worldPopLayerName, type: 'World Population', layer: worldPopLayer },
+    globalRice: { name: globalRiceLayerName, type: 'Global Rice', layer: globalRiceLayer }
+  };
+}
 
+
+// Color scale definitions for each layer type (matching actual SLD styles)
+const colorScales = {
+  'RAI': {
+    name: 'RAI Heatmap',
+    // Red monochrome scale: dark red (critical deficit) to light pink (surplus)
+    colors: ['#67000d', '#a50f15', '#cb181d', '#ef3b2c', '#fb6a4a', '#fc9272', '#fcbba1', '#fee0d2', '#fff5f0'],
+    values: ['0%', '10%', '25%', '50%', '75%', '100%', '150%', '200%+', '300%+'],
+    unit: '%',
+    description: 'Dark red = Critical deficit, Light pink = Surplus'
+  },
+  'World Population': {
+    name: 'Population Density',
+    // Black overlay with varying opacity - shown as grayscale gradient
+    colors: ['#ffffff', '#e0e0e0', '#c0c0c0', '#a0a0a0', '#808080', '#606060', '#404040', '#202020', '#000000'],
+    values: ['0', '100', '500', '1k', '5k', '10k', '25k', '50k', '250k+'],
+    unit: 'people',
+    description: 'White = Unpopulated, Black = High density'
+  },
+  'Global Rice': {
+    name: 'Rice Harvest',
+    // Green scale: transparent/white to dark green
+    colors: ['#ffffff', '#d4f1d4', '#a8e3a8', '#7dd57d', '#41ab5d', '#238b45', '#006d2c', '#00441b', '#002d12'],
+    values: ['0', '100', '500', '1k', '1.5k', '2k', '3k', '5k+', ''],
+    unit: 'tonnes',
+    description: 'White = No production, Dark green = High production'
+  }
+};
+
+// Function to create gradient CSS
+function createGradient(colors) {
+  const stops = colors.map((color, i) => 
+    `${color} ${(i / (colors.length - 1)) * 100}%`
+  ).join(', ');
+  return `linear-gradient(to right, ${stops})`;
+}
+
+// Function to update the legend
+function updateLegend() {
+  if (!map) return;
+  
+  // Remove old legend if it exists
+  if (legendControl) {
+    map.removeControl(legendControl);
+  }
+  
+  // Get enabled layers
+  const enabledLayers = [];
+  if (map.hasLayer(raiLayer)) {
+    enabledLayers.push('RAI');
+  }
+  if (map.hasLayer(worldPopLayer)) {
+    enabledLayers.push('World Population');
+  }
+  if (map.hasLayer(globalRiceLayer)) {
+    enabledLayers.push('Global Rice');
+  }
+  
+  // Only show legend if there are enabled layers
+  if (enabledLayers.length === 0) {
+    return;
+  }
+  
+  // Create custom legend control
+  legendControl = L.control({ position: 'bottomright' });
+  
+  let isLegendCollapsed = false;
+  
+  legendControl.onAdd = function() {
+    const div = L.DomUtil.create('div', 'custom-legend');
+    div.style.backgroundColor = 'rgba(30, 41, 59, 0.95)';
+    div.style.padding = '8px';
+    div.style.borderRadius = '6px';
+    div.style.border = '1px solid #334155';
+    div.style.color = 'white';
+    div.style.fontSize = '11px';
+    div.style.minWidth = '160px';
+    div.style.maxWidth = '180px';
+    div.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.3)';
+    div.style.cursor = 'pointer';
+    
+    const contentDiv = L.DomUtil.create('div', 'legend-content');
+    
+    const headerDiv = L.DomUtil.create('div', 'legend-header');
+    headerDiv.style.display = 'flex';
+    headerDiv.style.justifyContent = 'space-between';
+    headerDiv.style.alignItems = 'center';
+    headerDiv.style.marginBottom = '8px';
+    headerDiv.style.fontWeight = '600';
+    headerDiv.style.fontSize = '12px';
+    headerDiv.style.cursor = 'pointer';
+    
+    const titleSpan = L.DomUtil.create('span');
+    titleSpan.textContent = 'Color Scale';
+    
+    const toggleSpan = L.DomUtil.create('span', 'legend-toggle');
+    toggleSpan.textContent = '▼';
+    toggleSpan.style.fontSize = '10px';
+    toggleSpan.style.color = '#60a5fa';
+    
+    headerDiv.appendChild(titleSpan);
+    headerDiv.appendChild(toggleSpan);
+    contentDiv.appendChild(headerDiv);
+    
+    const scalesDiv = L.DomUtil.create('div', 'legend-scales');
+    
+    enabledLayers.forEach((layerType, index) => {
+      const scale = colorScales[layerType];
+      if (!scale) return;
+      
+      if (index > 0) {
+        const separator = L.DomUtil.create('div');
+        separator.style.marginTop = '10px';
+        separator.style.borderTop = '1px solid #334155';
+        separator.style.paddingTop = '10px';
+        scalesDiv.appendChild(separator);
+      }
+      
+      const scaleDiv = L.DomUtil.create('div');
+      scaleDiv.style.marginBottom = '6px';
+      
+      const nameDiv = L.DomUtil.create('div');
+      nameDiv.textContent = scale.name;
+      nameDiv.style.fontWeight = '500';
+      nameDiv.style.marginBottom = '4px';
+      nameDiv.style.color = '#60a5fa';
+      nameDiv.style.fontSize = '10px';
+      
+      const gradientDiv = L.DomUtil.create('div');
+      gradientDiv.style.height = '16px';
+      gradientDiv.style.borderRadius = '3px';
+      gradientDiv.style.marginBottom = '3px';
+      gradientDiv.style.background = createGradient(scale.colors);
+      gradientDiv.style.border = '1px solid #475569';
+      
+      const valuesDiv = L.DomUtil.create('div');
+      valuesDiv.style.display = 'flex';
+      valuesDiv.style.justifyContent = 'space-between';
+      valuesDiv.style.fontSize = '9px';
+      valuesDiv.style.color = '#cbd5e1';
+      
+      const minSpan = L.DomUtil.create('span');
+      minSpan.textContent = scale.values[0];
+      const maxSpan = L.DomUtil.create('span');
+      maxSpan.textContent = scale.values[scale.values.length - 1];
+      
+      valuesDiv.appendChild(minSpan);
+      valuesDiv.appendChild(maxSpan);
+      
+      scaleDiv.appendChild(nameDiv);
+      scaleDiv.appendChild(gradientDiv);
+      scaleDiv.appendChild(valuesDiv);
+      
+      // Add description if available
+      if (scale.description) {
+        const descDiv = L.DomUtil.create('div');
+        descDiv.textContent = scale.description;
+        descDiv.style.fontSize = '8px';
+        descDiv.style.color = '#94a3b8';
+        descDiv.style.marginTop = '2px';
+        descDiv.style.fontStyle = 'italic';
+        scaleDiv.appendChild(descDiv);
+      }
+      
+      scalesDiv.appendChild(scaleDiv);
+    });
+    
+    contentDiv.appendChild(scalesDiv);
+    div.appendChild(contentDiv);
+    
+    // Toggle functionality
+    L.DomEvent.on(headerDiv, 'click', function() {
+      isLegendCollapsed = !isLegendCollapsed;
+      if (isLegendCollapsed) {
+        scalesDiv.style.display = 'none';
+        toggleSpan.textContent = '▶';
+      } else {
+        scalesDiv.style.display = 'block';
+        toggleSpan.textContent = '▼';
+      }
+    });
+    
+    // Prevent map clicks when clicking on legend
+    L.DomEvent.disableClickPropagation(div);
+    
+    return div;
+  };
+  
+  legendControl.addTo(map);
+}
+
+function updateMapView(map, country) {
   if (map && countryViewConfig[country]) {
     const config = countryViewConfig[country];
     console.log(`Updating map view for ${country}:`, config);
-
-    if (raiLayer) {
-      map.removeLayer(raiLayer);
-    }
-
-    // Add RAI overlay from wms server
-    raiLayer = L.tileLayer.wms(wmsUrl, {
-      layers: layerName,
-      format: 'image/png',
-      transparent: true,
-      version: '1.3.0',
-      
-      // Performance & quality improvements
-      tileSize: 512,          // Larger tiles = fewer tile lines
-      detectRetina: true,     // Better quality on retina displays
-      updateWhenIdle: true,   // Less flickering
-      keepBuffer: 2,          // Keep tiles in memory
-      zIndex: 1000,           // Ensure it's on top of other layers (default is 400)
-      attribution: 'Rice Area Index Data'
-    }).addTo(map);
     
     // Set zoom restrictions for this country
     map.setMinZoom(config.minZoom);
@@ -207,52 +513,43 @@ function updateMapView(map, country, year, wmsUrl, layerName) {
       map.setZoom(config.maxZoom);
     }
   } else {
-    console.log(`Map view update failed - map: ${!!map}, country: ${country}, year: ${year}, config exists: ${!!countryViewConfig[country]}`);
+    console.log(`Map view update failed - map: ${!!map}, country: ${country}, config exists: ${!!countryViewConfig[country]}`);
   }
 }
 
-function queryWmsFeature(map, wmsUrl, layerName, latlng, countryBounds) {
-  // Use a fixed high resolution and country bounds for consistent queries across zoom levels
-  // This ensures the same geographic location always maps to the same pixel position
+// Helper function to query a single WMS layer
+function querySingleLayer(wmsUrl, layerName, latlng, countryBounds) {
   const fixedWidth = 2000;
   const fixedHeight = 2000;
   
-  // Use country bounds instead of current map view bounds for consistency
-  const west = countryBounds[0][1];  // min longitude
-  const south = countryBounds[0][0];  // min latitude
-  const east = countryBounds[1][1];   // max longitude
-  const north = countryBounds[1][0];  // max latitude
+  const west = countryBounds[0][1];
+  const south = countryBounds[0][0];
+  const east = countryBounds[1][1];
+  const north = countryBounds[1][0];
   
   const bbox = west + ',' + south + ',' + east + ',' + north;
   
-  // Calculate the pixel position in the fixed resolution based on lat/lng
-  // Calculate pixel X based on longitude
   const pixelX = Math.round(((latlng.lng - west) / (east - west)) * fixedWidth);
-  
-  // Calculate pixel Y based on latitude (inverted because WMS uses bottom-left origin)
   const pixelY = Math.round(((north - latlng.lat) / (north - south)) * fixedHeight);
   
-  // Clamp pixel coordinates to valid range
   const x = Math.max(0, Math.min(fixedWidth - 1, pixelX));
   const y = Math.max(0, Math.min(fixedHeight - 1, pixelY));
   
   const url = wmsUrl + '?' + 
-  'SERVICE=WMS&' +
-  'VERSION=1.1.1&' +
-  'REQUEST=GetFeatureInfo&' +
-  'LAYERS=' + encodeURIComponent(layerName) + '&' +
-  'QUERY_LAYERS=' + encodeURIComponent(layerName) + '&' +
-  'STYLES=&' +
-  'BBOX=' + bbox + '&' +
-  'WIDTH=' + fixedWidth + '&' +
-  'HEIGHT=' + fixedHeight + '&' +
-  'SRS=EPSG:4326&' +
-  'FORMAT=image/png&' +
-  'INFO_FORMAT=application/json&' +
-  'X=' + x + '&' +
-  'Y=' + y;
-
-  console.log('GetFeatureInfo query:', { x, y, latlng, bbox, url });
+    'SERVICE=WMS&' +
+    'VERSION=1.1.1&' +
+    'REQUEST=GetFeatureInfo&' +
+    'LAYERS=' + encodeURIComponent(layerName) + '&' +
+    'QUERY_LAYERS=' + encodeURIComponent(layerName) + '&' +
+    'STYLES=&' +
+    'BBOX=' + bbox + '&' +
+    'WIDTH=' + fixedWidth + '&' +
+    'HEIGHT=' + fixedHeight + '&' +
+    'SRS=EPSG:4326&' +
+    'FORMAT=image/png&' +
+    'INFO_FORMAT=application/json&' +
+    'X=' + x + '&' +
+    'Y=' + y;
 
   return fetch(url)
     .then(response => {
@@ -261,47 +558,93 @@ function queryWmsFeature(map, wmsUrl, layerName, latlng, countryBounds) {
       }
       return response.json();
     })
-    .then(data => {
-      console.log('WMS GetFeatureInfo response:', data);
-      if (data.features && data.features.length > 0) {
-        const properties = data.features[0].properties;
-        let content = '<div style="font-size: 12px;">';
-        let hasValidData = false;
-        
-        for (let key in properties) {
-          const value = properties[key];
-          // Skip no-data values (-9999, null, undefined, NaN)
-          if (value !== null && value !== undefined && !isNaN(value) && value !== -9999 && value !== '-9999') {
-            content += `<div><b>RAI:</b> ${parseFloat(value).toFixed(3)}</div>`;
+    .catch(error => {
+      console.error(`Error querying layer ${layerName}:`, error);
+      return null;
+    });
+}
+
+function queryWmsFeature(map, wmsUrl, enabledLayers, latlng, countryBounds) {
+  // Query all enabled layers in parallel
+  const layerQueries = enabledLayers.map(layerInfo => 
+    querySingleLayer(wmsUrl, layerInfo.name, latlng, countryBounds)
+      .then(data => ({ layerInfo, data }))
+  );
+
+  return Promise.all(layerQueries)
+    .then(results => {
+      let content = '<div style="font-size: 12px;">';
+      let hasValidData = false;
+      
+      results.forEach(({ layerInfo, data }) => {
+        if (data && data.features && data.features.length > 0) {
+          const properties = data.features[0].properties;
+          let layerHasData = false;
+          
+          for (let key in properties) {
+            const value = properties[key];
+            // Skip no-data values (-9999, null, undefined, NaN)
+            if (value !== null && value !== undefined && !isNaN(value) && value !== -9999 && value !== '-9999') {
+              const numValue = parseFloat(value);
+              
+              // Format based on layer type
+              if (layerInfo.type === 'RAI') {
+                // RAI as percentage
+                const percentage = (numValue).toFixed(2);
+                content += `<div><b>RAI:</b> ${percentage}%</div>`;
+                layerHasData = true;
+              } else if (layerInfo.type === 'World Population') {
+                // Population Density: People per pixel (PPL)
+                // Format as whole number since it represents count of people
+                const formattedValue = numValue >= 1000 
+                  ? numValue.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                  : numValue.toFixed(0);
+                content += `<div><b>Population Density:</b> ${formattedValue} people</div>`;
+                layerHasData = true;
+              } else if (layerInfo.type === 'Global Rice') {
+                // Rice Harvest: Metric tonnes (1,000 kg) per grid cell
+                // Format with appropriate precision for metric tonnes
+                let formattedValue;
+                if (numValue >= 1000000) {
+                  formattedValue = (numValue / 1000000).toFixed(2) + 'M tonnes';
+                } else if (numValue >= 1000) {
+                  formattedValue = (numValue / 1000).toFixed(2) + 'k tonnes';
+                } else {
+                  formattedValue = numValue.toFixed(2) + ' tonnes';
+                }
+                content += `<div><b>Rice Harvest:</b> ${formattedValue}</div>`;
+                layerHasData = true;
+              } else {
+                content += `<div><b>${layerInfo.type}:</b> ${numValue.toFixed(3)}</div>`;
+                layerHasData = true;
+              }
+            }
+          }
+          
+          if (layerHasData) {
             hasValidData = true;
           }
         }
-        
-        if (!hasValidData) {
-          content = '<div>No data at this location (no-data value)</div>';
-        }
-        content += '</div>';
-        
-        L.popup()
-          .setLatLng(latlng)
-          .setContent(content)
-          .openOn(map);
-      } else {
-        L.popup()
-          .setLatLng(latlng)
-          .setContent('<div>No data at this location</div>')
-          .openOn(map);
+      });
+      
+      if (!hasValidData) {
+        content = '<div>No data at this location (no-data value)</div>';
       }
-      return data;
+      content += '</div>';
+      
+      L.popup()
+        .setLatLng(latlng)
+        .setContent(content)
+        .openOn(map);
     })
     .catch(error => {
-      console.error('Error querying WMS:', error);
+      console.error('Error querying WMS layers:', error);
       L.popup()
         .setLatLng(latlng)
         .setContent('<div>Error retrieving data: ' + error.message + '</div>')
         .openOn(map);
     });
-  }
+}
 
 
 
@@ -362,83 +705,69 @@ d3.csv("master_dataset.csv").then(function(data){
       maxBounds: null // No initial bounds restriction
     }).setView([20, 0], 2);
     // CartoDB Positron - clean, minimal basemap without labels, perfect for raster overlays
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+    positronBaseLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: 'abcd',
       maxZoom: 19
     }).addTo(map);
   }
+  const wmsUrl = "https://crcdata.soest.hawaii.edu/geoserver/ows";
 
   //updatePanels(); // initial render
 
   window.updatePanels = function updatePanels() {
-     const year = document.querySelector("#yearMenu .active").dataset.year;
+    const year = document.querySelector("#yearMenu .active").dataset.year;
     const category = document.querySelector("#categoryMenu .active").dataset.type;
     const countryEl = document.querySelector(".country.active");
     const countryId = countryEl ? countryEl.dataset.country : null;
 
-
     const activeBtn = document.querySelector(".country.active");
     const countryName = activeBtn ? activeBtn.dataset.countryName : null;
-
-    const wmsUrl = "https://crcdata.soest.hawaii.edu/geoserver/ows";
-    const layerName = countryName
-      ? `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year}_rai`
-      : null;
-
-    // map update
-    if (map && countryName && countryViewConfig[countryName]) {
-      const cfg = countryViewConfig[countryName];
-
-      if (raiLayer) map.removeLayer(raiLayer);
-      raiLayer = L.tileLayer.wms(wmsUrl, {
-        layers: layerName,
-        format: "image/png",
-        transparent: true
-      }).addTo(map);
-
-      map.setView(cfg.center, cfg.zoom);
-      if (cfg.bounds) map.setMaxBounds(cfg.bounds);
-    }
 
     // left header
     const leftPanel = document.getElementById("leftPanel");
     const mapContainer = document.getElementById("map");
 
     if (map) {
-
       // Remove old click listeners to avoid duplicates
-
       map.off('click');
 
-      
-
       if (countryName) {
+        // Update layers (this will preserve visibility state)
+        const layerInfo = updateLayers(countryName, year, wmsUrl);
+        
+        // Update map view (center, zoom, bounds)
+        updateMapView(map, countryName);
 
-        updateMapView(map, countryName, year, wmsUrl, layerName);
+        // Get country bounds for consistent queries
+        const countryConfig = countryViewConfig[countryName];
+        const countryBounds = countryConfig ? countryConfig.bounds : null;
 
+        if (countryBounds) {
+          map.on('click', (e) => {
+            // Get enabled layers (only query layers that are currently visible on the map)
+            const enabledLayers = [];
+            if (map.hasLayer(layerInfo.rai.layer) && layerInfo.rai.name) {
+              enabledLayers.push({ name: layerInfo.rai.name, type: layerInfo.rai.type });
+            }
+            if (map.hasLayer(layerInfo.worldPop.layer) && layerInfo.worldPop.name) {
+              enabledLayers.push({ name: layerInfo.worldPop.name, type: layerInfo.worldPop.type });
+            }
+            if (map.hasLayer(layerInfo.globalRice.layer) && layerInfo.globalRice.name) {
+              enabledLayers.push({ name: layerInfo.globalRice.name, type: layerInfo.globalRice.type });
+            }
+            
+            if (enabledLayers.length > 0) {
+              queryWmsFeature(map, wmsUrl, enabledLayers, e.latlng, countryBounds);
+            } else {
+              L.popup()
+                .setLatLng(e.latlng)
+                .setContent('<div>No layers enabled. Please enable at least one layer to query data.</div>')
+                .openOn(map);
+            }
+          });
+        }
       }
-
-      
-
-      // Get country bounds for consistent queries
-
-      const countryConfig = countryName ? countryViewConfig[countryName] : null;
-
-      const countryBounds = countryConfig ? countryConfig.bounds : null;
-
-      
-
-      if (countryBounds) {
-
-        map.on('click', (e) => {
-
-          queryWmsFeature(map, wmsUrl, layerName, e.latlng, countryBounds);
-
-        });
-
-      }
-
     }
     let header = leftPanel.querySelector("h3");
     if (!header) {
@@ -446,9 +775,36 @@ d3.csv("master_dataset.csv").then(function(data){
       leftPanel.insertBefore(header, mapContainer);
     }
     const row = data.find(r => r.Country === countryName && String(r.Year) === String(year));
-    header.textContent = `Heatmap for ${
+    const raiValue = row ? row.National_RAI : "N/A";
+    const ssrValue = row ? row.SSR : "N/A";
+    
+    header.innerHTML = `Heatmap for ${
       countryName ? countryName.toUpperCase() : "—"
-    } – ${year} – RAI: ${row ? row.National_RAI : "N/A"} – SSR: ${row ? row.SSR : "N/A"}`;
+    } – ${year} – RAI: ${raiValue}%<span class="tooltip-trigger" data-tooltip="rai">ℹ️<span class="tooltip-content"><h4>Rice Accessibility Index (RAI)</h4><p>Measures whether rice produced within 50km of each location can meet local consumption needs.</p><ul><li><strong>100%</strong> = Local production meets local demand</li><li><strong>&gt;100%</strong> = Surplus production nearby</li><li><strong>&lt;100%</strong> = Insufficient local production</li></ul><p>This reveals vulnerabilities in the food system even when national production seems adequate. Urban areas often show low RAI due to geographic separation from rural production zones.</p></span></span> – SSR: ${ssrValue}%<span class="tooltip-trigger" data-tooltip="ssr">ℹ️<span class="tooltip-content"><h4>Self-Sufficiency Ratio (SSR)</h4><p>Measures whether a country's total rice production can meet its total national consumption needs.</p><ul><li><strong>100%</strong> = National production meets national demand</li><li><strong>&gt;100%</strong> = Net exporter (produces surplus)</li><li><strong>&lt;100%</strong> = Import dependent (production deficit)</li></ul><p>This shows overall national food security but doesn't reveal regional vulnerabilities or supply chain risks within the country.</p></span></span>`;
+
+    // Add click handlers for tooltips
+    header.querySelectorAll('.tooltip-trigger').forEach(trigger => {
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Close all other tooltips
+        header.querySelectorAll('.tooltip-trigger').forEach(t => {
+          if (t !== trigger) {
+            t.classList.remove('active');
+          }
+        });
+        // Toggle current tooltip
+        trigger.classList.toggle('active');
+      });
+    });
+
+    // Close tooltips when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!header.contains(e.target)) {
+        header.querySelectorAll('.tooltip-trigger').forEach(trigger => {
+          trigger.classList.remove('active');
+        });
+      }
+    });
 
     // render right panel
     if(category === "generic_data")
@@ -509,43 +865,25 @@ d3.csv("master_dataset.csv").then(function(data){
 
   
   // Year menu listeners
-
   document.querySelectorAll('#yearMenu .menu-item').forEach(button => {
-
     button.addEventListener('click', () => {
-
       document.querySelectorAll('#yearMenu .menu-item')
-
         .forEach(b => b.classList.remove('active'));
-
       button.classList.add('active');
-
       // clear highlight when year changes
-
       highlightedCountry = null;
-
       updatePanels();
-
     });
-
   });
 
   // Category menu listeners
-
   document.querySelectorAll('#categoryMenu .menu-item').forEach(button => {
-
     button.addEventListener('click', () => {
-
       document.querySelectorAll('#categoryMenu .menu-item')
-
         .forEach(b => b.classList.remove('active'));
-
       button.classList.add('active');
-
       updatePanels();
-
     });
-
   });
 
   // Expose global highlight function
