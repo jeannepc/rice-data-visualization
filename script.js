@@ -150,6 +150,16 @@ const countryViewConfig = {
 };
 
 let raiLayer = null;
+let worldPopLayer = null;
+let globalRiceLayer = null;
+let positronBaseLayer = null;
+let layerControl = null;
+// Store layer visibility state to persist across country switches
+let layerVisibilityState = {
+  "RAI Heatmap": true,  // Default to visible
+  "World Population": false,
+  "Global Rice": false
+};
 
 window.sharedState = {
   highlightedCountry: null,
@@ -160,32 +170,117 @@ window.sharedState = {
   }
 };
 
+// Function to save current layer visibility state
+function saveLayerVisibilityState() {
+  if (layerControl) {
+    // Check which layers are currently on the map
+    layerVisibilityState["RAI Heatmap"] = map.hasLayer(raiLayer);
+    layerVisibilityState["World Population"] = map.hasLayer(worldPopLayer);
+    layerVisibilityState["Global Rice"] = map.hasLayer(globalRiceLayer);
+  }
+}
 
-function updateMapView(map, country, year, wmsUrl, layerName) {
+// Function to update layers when country or year changes
+function updateLayers(countryName, year, wmsUrl) {
+  // Save current visibility state before removing layers
+  saveLayerVisibilityState();
+  
+  // Remove old layers from map
+  if (raiLayer) map.removeLayer(raiLayer);
+  if (worldPopLayer) map.removeLayer(worldPopLayer);
+  if (globalRiceLayer) map.removeLayer(globalRiceLayer);
+  
+  // Remove old layer control
+  if (layerControl) {
+    map.removeControl(layerControl);
+  }
+  
+  // Create new layer names based on current country and year
+  const riceLayerName = countryName
+    ? `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year}_rai`
+    : null;
+  const worldPopLayerName = countryName
+    ? `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year}_pop_10km_aligned`
+    : null;
+  const globalRiceLayerName = countryName
+    ? `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year}_rice_10km`
+    : null;
+  
+  // Create new layers
+  raiLayer = L.tileLayer.wms(wmsUrl, {
+    layers: riceLayerName,
+    format: "image/png",
+    transparent: true,
+    version: '1.3.0',
+    tileSize: 512,
+    detectRetina: true,
+    updateWhenIdle: true,
+    keepBuffer: 2,
+    zIndex: 1000,
+    attribution: 'Rice Area Index Data'
+  });
+  
+  worldPopLayer = L.tileLayer.wms(wmsUrl, {
+    layers: worldPopLayerName,
+    format: "image/png",
+    transparent: true,
+    version: '1.3.0',
+    tileSize: 512,
+    detectRetina: true,
+    updateWhenIdle: true,
+    keepBuffer: 2,
+    zIndex: 999,
+    attribution: 'World Population Data'
+  });
+  
+  globalRiceLayer = L.tileLayer.wms(wmsUrl, {
+    layers: globalRiceLayerName,
+    format: "image/png",
+    transparent: true,
+    version: '1.3.0',
+    tileSize: 512,
+    detectRetina: true,
+    updateWhenIdle: true,
+    keepBuffer: 2,
+    zIndex: 998,
+    attribution: 'Global Rice Data'
+  });
+  
+  // Restore visibility state by adding layers to map first
+  // This ensures the layer control reflects the correct initial state
+  if (layerVisibilityState["RAI Heatmap"]) {
+    raiLayer.addTo(map);
+  }
+  if (layerVisibilityState["World Population"]) {
+    worldPopLayer.addTo(map);
+  }
+  if (layerVisibilityState["Global Rice"]) {
+    globalRiceLayer.addTo(map);
+  }
+  
+  // Create base layers object
+  const baseLayers = {
+    "Positron": positronBaseLayer
+  };
+  
+  // Create overlays object
+  const overlays = {
+    "RAI Heatmap": raiLayer,
+    "World Population": worldPopLayer,
+    "Global Rice": globalRiceLayer
+  };
+  
+  // Create new layer control (it will automatically detect which layers are on the map)
+  layerControl = L.control.layers(baseLayers, overlays).addTo(map);
+  
+  return riceLayerName; // Return for use in queryWmsFeature
+}
 
+
+function updateMapView(map, country) {
   if (map && countryViewConfig[country]) {
     const config = countryViewConfig[country];
     console.log(`Updating map view for ${country}:`, config);
-
-    if (raiLayer) {
-      map.removeLayer(raiLayer);
-    }
-
-    // Add RAI overlay from wms server
-    raiLayer = L.tileLayer.wms(wmsUrl, {
-      layers: layerName,
-      format: 'image/png',
-      transparent: true,
-      version: '1.3.0',
-      
-      // Performance & quality improvements
-      tileSize: 512,          // Larger tiles = fewer tile lines
-      detectRetina: true,     // Better quality on retina displays
-      updateWhenIdle: true,   // Less flickering
-      keepBuffer: 2,          // Keep tiles in memory
-      zIndex: 1000,           // Ensure it's on top of other layers (default is 400)
-      attribution: 'Rice Area Index Data'
-    }).addTo(map);
     
     // Set zoom restrictions for this country
     map.setMinZoom(config.minZoom);
@@ -208,7 +303,7 @@ function updateMapView(map, country, year, wmsUrl, layerName) {
       map.setZoom(config.maxZoom);
     }
   } else {
-    console.log(`Map view update failed - map: ${!!map}, country: ${country}, year: ${year}, config exists: ${!!countryViewConfig[country]}`);
+    console.log(`Map view update failed - map: ${!!map}, country: ${country}, config exists: ${!!countryViewConfig[country]}`);
   }
 }
 
@@ -357,83 +452,50 @@ d3.csv("master_dataset.csv").then(function(data){
       maxBounds: null // No initial bounds restriction
     }).setView([20, 0], 2);
     // CartoDB Positron - clean, minimal basemap without labels, perfect for raster overlays
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+    positronBaseLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
       subdomains: 'abcd',
       maxZoom: 19
     }).addTo(map);
   }
+  const wmsUrl = "https://crcdata.soest.hawaii.edu/geoserver/ows";
 
   //updatePanels(); // initial render
 
   window.updatePanels = function updatePanels() {
-     const year = document.querySelector("#yearMenu .active").dataset.year;
+    const year = document.querySelector("#yearMenu .active").dataset.year;
     const category = document.querySelector("#categoryMenu .active").dataset.type;
     const countryEl = document.querySelector(".country.active");
     const countryId = countryEl ? countryEl.dataset.country : null;
 
-
     const activeBtn = document.querySelector(".country.active");
     const countryName = activeBtn ? activeBtn.dataset.countryName : null;
-
-    const wmsUrl = "https://crcdata.soest.hawaii.edu/geoserver/ows";
-    const layerName = countryName
-      ? `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year}_rai`
-      : null;
-
-    // map update
-    if (map && countryName && countryViewConfig[countryName]) {
-      const cfg = countryViewConfig[countryName];
-
-      if (raiLayer) map.removeLayer(raiLayer);
-      raiLayer = L.tileLayer.wms(wmsUrl, {
-        layers: layerName,
-        format: "image/png",
-        transparent: true
-      }).addTo(map);
-
-      map.setView(cfg.center, cfg.zoom);
-      if (cfg.bounds) map.setMaxBounds(cfg.bounds);
-    }
 
     // left header
     const leftPanel = document.getElementById("leftPanel");
     const mapContainer = document.getElementById("map");
 
     if (map) {
-
       // Remove old click listeners to avoid duplicates
-
       map.off('click');
 
-      
-
       if (countryName) {
+        // Update layers (this will preserve visibility state)
+        const layerName = updateLayers(countryName, year, wmsUrl);
+        
+        // Update map view (center, zoom, bounds)
+        updateMapView(map, countryName);
 
-        updateMapView(map, countryName, year, wmsUrl, layerName);
+        // Get country bounds for consistent queries
+        const countryConfig = countryViewConfig[countryName];
+        const countryBounds = countryConfig ? countryConfig.bounds : null;
 
+        if (countryBounds) {
+          map.on('click', (e) => {
+            queryWmsFeature(map, wmsUrl, layerName, e.latlng, countryBounds);
+          });
+        }
       }
-
-      
-
-      // Get country bounds for consistent queries
-
-      const countryConfig = countryName ? countryViewConfig[countryName] : null;
-
-      const countryBounds = countryConfig ? countryConfig.bounds : null;
-
-      
-
-      if (countryBounds) {
-
-        map.on('click', (e) => {
-
-          queryWmsFeature(map, wmsUrl, layerName, e.latlng, countryBounds);
-
-        });
-
-      }
-
     }
     let header = leftPanel.querySelector("h3");
     if (!header) {
@@ -496,43 +558,25 @@ d3.csv("master_dataset.csv").then(function(data){
 
   
   // Year menu listeners
-
   document.querySelectorAll('#yearMenu .menu-item').forEach(button => {
-
     button.addEventListener('click', () => {
-
       document.querySelectorAll('#yearMenu .menu-item')
-
         .forEach(b => b.classList.remove('active'));
-
       button.classList.add('active');
-
       // clear highlight when year changes
-
       highlightedCountry = null;
-
       updatePanels();
-
     });
-
   });
 
   // Category menu listeners
-
   document.querySelectorAll('#categoryMenu .menu-item').forEach(button => {
-
     button.addEventListener('click', () => {
-
       document.querySelectorAll('#categoryMenu .menu-item')
-
         .forEach(b => b.classList.remove('active'));
-
       button.classList.add('active');
-
       updatePanels();
-
     });
-
   });
 
   // Expose global highlight function
