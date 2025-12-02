@@ -229,3 +229,17 @@ body {
   background: #64748b;
 }
 
+/* LEGEND STYLES */
+.custom-legend {
+  font-family: Arial, sans-serif;
+}
+
+.custom-legend a {
+  color: #60a5fa;
+  text-decoration: none;
+}
+
+.custom-legend a:hover {
+  color: #93c5fd;
+}
+

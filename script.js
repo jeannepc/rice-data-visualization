@@ -154,6 +154,7 @@ let worldPopLayer = null;
 let globalRiceLayer = null;
 let positronBaseLayer = null;
 let layerControl = null;
+let legendControl = null;
 // Store layer visibility state to persist across country switches
 let layerVisibilityState = {
   "RAI Heatmap": true,  // Default to visible
@@ -194,6 +195,9 @@ function updateLayers(countryName, year, wmsUrl) {
   if (layerControl) {
     map.removeControl(layerControl);
   }
+  
+  // Remove old legend event listeners
+  map.off('overlayadd overlayremove', updateLegend);
   
   // Create new layer names based on current country and year
   const riceLayerName = countryName
@@ -273,6 +277,18 @@ function updateLayers(countryName, year, wmsUrl) {
   // Create new layer control (it will automatically detect which layers are on the map)
   layerControl = L.control.layers(baseLayers, overlays).addTo(map);
   
+  // Update legend after layers are created (with small delay to ensure layers are added)
+  setTimeout(() => {
+    updateLegend();
+  }, 100);
+  
+  // Listen for layer add/remove events to update legend
+  map.on('overlayadd overlayremove', () => {
+    setTimeout(() => {
+      updateLegend();
+    }, 50);
+  });
+  
   // Return layer information for querying
   return {
     rai: { name: riceLayerName, type: 'RAI', layer: raiLayer },
@@ -281,6 +297,196 @@ function updateLayers(countryName, year, wmsUrl) {
   };
 }
 
+
+// Color scale definitions for each layer type (matching actual SLD styles)
+const colorScales = {
+  'RAI': {
+    name: 'RAI Heatmap',
+    // Red monochrome scale: dark red (critical deficit) to light pink (surplus)
+    colors: ['#67000d', '#a50f15', '#cb181d', '#ef3b2c', '#fb6a4a', '#fc9272', '#fcbba1', '#fee0d2', '#fff5f0'],
+    values: ['0%', '10%', '25%', '50%', '75%', '100%', '150%', '200%+', '300%+'],
+    unit: '%',
+    description: 'Dark red = Critical deficit, Light pink = Surplus'
+  },
+  'World Population': {
+    name: 'Population Density',
+    // Black overlay with varying opacity - shown as grayscale gradient
+    colors: ['#ffffff', '#e0e0e0', '#c0c0c0', '#a0a0a0', '#808080', '#606060', '#404040', '#202020', '#000000'],
+    values: ['0', '100', '500', '1k', '5k', '10k', '25k', '50k', '250k+'],
+    unit: 'people',
+    description: 'White = Unpopulated, Black = High density'
+  },
+  'Global Rice': {
+    name: 'Rice Harvest',
+    // Green scale: transparent/white to dark green
+    colors: ['#ffffff', '#d4f1d4', '#a8e3a8', '#7dd57d', '#41ab5d', '#238b45', '#006d2c', '#00441b', '#002d12'],
+    values: ['0', '100', '500', '1k', '1.5k', '2k', '3k', '5k+', ''],
+    unit: 'tonnes',
+    description: 'White = No production, Dark green = High production'
+  }
+};
+
+// Function to create gradient CSS
+function createGradient(colors) {
+  const stops = colors.map((color, i) => 
+    `${color} ${(i / (colors.length - 1)) * 100}%`
+  ).join(', ');
+  return `linear-gradient(to right, ${stops})`;
+}
+
+// Function to update the legend
+function updateLegend() {
+  if (!map) return;
+  
+  // Remove old legend if it exists
+  if (legendControl) {
+    map.removeControl(legendControl);
+  }
+  
+  // Get enabled layers
+  const enabledLayers = [];
+  if (map.hasLayer(raiLayer)) {
+    enabledLayers.push('RAI');
+  }
+  if (map.hasLayer(worldPopLayer)) {
+    enabledLayers.push('World Population');
+  }
+  if (map.hasLayer(globalRiceLayer)) {
+    enabledLayers.push('Global Rice');
+  }
+  
+  // Only show legend if there are enabled layers
+  if (enabledLayers.length === 0) {
+    return;
+  }
+  
+  // Create custom legend control
+  legendControl = L.control({ position: 'bottomright' });
+  
+  let isLegendCollapsed = false;
+  
+  legendControl.onAdd = function() {
+    const div = L.DomUtil.create('div', 'custom-legend');
+    div.style.backgroundColor = 'rgba(30, 41, 59, 0.95)';
+    div.style.padding = '8px';
+    div.style.borderRadius = '6px';
+    div.style.border = '1px solid #334155';
+    div.style.color = 'white';
+    div.style.fontSize = '11px';
+    div.style.minWidth = '160px';
+    div.style.maxWidth = '180px';
+    div.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.3)';
+    div.style.cursor = 'pointer';
+    
+    const contentDiv = L.DomUtil.create('div', 'legend-content');
+    
+    const headerDiv = L.DomUtil.create('div', 'legend-header');
+    headerDiv.style.display = 'flex';
+    headerDiv.style.justifyContent = 'space-between';
+    headerDiv.style.alignItems = 'center';
+    headerDiv.style.marginBottom = '8px';
+    headerDiv.style.fontWeight = '600';
+    headerDiv.style.fontSize = '12px';
+    headerDiv.style.cursor = 'pointer';
+    
+    const titleSpan = L.DomUtil.create('span');
+    titleSpan.textContent = 'Color Scale';
+    
+    const toggleSpan = L.DomUtil.create('span', 'legend-toggle');
+    toggleSpan.textContent = '▼';
+    toggleSpan.style.fontSize = '10px';
+    toggleSpan.style.color = '#60a5fa';
+    
+    headerDiv.appendChild(titleSpan);
+    headerDiv.appendChild(toggleSpan);
+    contentDiv.appendChild(headerDiv);
+    
+    const scalesDiv = L.DomUtil.create('div', 'legend-scales');
+    
+    enabledLayers.forEach((layerType, index) => {
+      const scale = colorScales[layerType];
+      if (!scale) return;
+      
+      if (index > 0) {
+        const separator = L.DomUtil.create('div');
+        separator.style.marginTop = '10px';
+        separator.style.borderTop = '1px solid #334155';
+        separator.style.paddingTop = '10px';
+        scalesDiv.appendChild(separator);
+      }
+      
+      const scaleDiv = L.DomUtil.create('div');
+      scaleDiv.style.marginBottom = '6px';
+      
+      const nameDiv = L.DomUtil.create('div');
+      nameDiv.textContent = scale.name;
+      nameDiv.style.fontWeight = '500';
+      nameDiv.style.marginBottom = '4px';
+      nameDiv.style.color = '#60a5fa';
+      nameDiv.style.fontSize = '10px';
+      
+      const gradientDiv = L.DomUtil.create('div');
+      gradientDiv.style.height = '16px';
+      gradientDiv.style.borderRadius = '3px';
+      gradientDiv.style.marginBottom = '3px';
+      gradientDiv.style.background = createGradient(scale.colors);
+      gradientDiv.style.border = '1px solid #475569';
+      
+      const valuesDiv = L.DomUtil.create('div');
+      valuesDiv.style.display = 'flex';
+      valuesDiv.style.justifyContent = 'space-between';
+      valuesDiv.style.fontSize = '9px';
+      valuesDiv.style.color = '#cbd5e1';
+      
+      const minSpan = L.DomUtil.create('span');
+      minSpan.textContent = scale.values[0];
+      const maxSpan = L.DomUtil.create('span');
+      maxSpan.textContent = scale.values[scale.values.length - 1];
+      
+      valuesDiv.appendChild(minSpan);
+      valuesDiv.appendChild(maxSpan);
+      
+      scaleDiv.appendChild(nameDiv);
+      scaleDiv.appendChild(gradientDiv);
+      scaleDiv.appendChild(valuesDiv);
+      
+      // Add description if available
+      if (scale.description) {
+        const descDiv = L.DomUtil.create('div');
+        descDiv.textContent = scale.description;
+        descDiv.style.fontSize = '8px';
+        descDiv.style.color = '#94a3b8';
+        descDiv.style.marginTop = '2px';
+        descDiv.style.fontStyle = 'italic';
+        scaleDiv.appendChild(descDiv);
+      }
+      
+      scalesDiv.appendChild(scaleDiv);
+    });
+    
+    contentDiv.appendChild(scalesDiv);
+    div.appendChild(contentDiv);
+    
+    // Toggle functionality
+    L.DomEvent.on(headerDiv, 'click', function() {
+      isLegendCollapsed = !isLegendCollapsed;
+      if (isLegendCollapsed) {
+        scalesDiv.style.display = 'none';
+        toggleSpan.textContent = '▶';
+      } else {
+        scalesDiv.style.display = 'block';
+        toggleSpan.textContent = '▼';
+      }
+    });
+    
+    // Prevent map clicks when clicking on legend
+    L.DomEvent.disableClickPropagation(div);
+    
+    return div;
+  };
+  
+  legendControl.addTo(map);
+}
 
 function updateMapView(map, country) {
   if (map && countryViewConfig[country]) {
