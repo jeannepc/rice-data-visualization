@@ -157,8 +157,8 @@ let layerControl = null;
 // Store layer visibility state to persist across country switches
 let layerVisibilityState = {
   "RAI Heatmap": true,  // Default to visible
-  "World Population": false,
-  "Global Rice": false
+  "Population Density": false,
+  "Rice Harvest": false
 };
 
 window.sharedState = {
@@ -175,8 +175,8 @@ function saveLayerVisibilityState() {
   if (layerControl) {
     // Check which layers are currently on the map
     layerVisibilityState["RAI Heatmap"] = map.hasLayer(raiLayer);
-    layerVisibilityState["World Population"] = map.hasLayer(worldPopLayer);
-    layerVisibilityState["Global Rice"] = map.hasLayer(globalRiceLayer);
+    layerVisibilityState["Population Density"] = map.hasLayer(worldPopLayer);
+    layerVisibilityState["Rice Harvest"] = map.hasLayer(globalRiceLayer);
   }
 }
 
@@ -251,10 +251,10 @@ function updateLayers(countryName, year, wmsUrl) {
   if (layerVisibilityState["RAI Heatmap"]) {
     raiLayer.addTo(map);
   }
-  if (layerVisibilityState["World Population"]) {
+  if (layerVisibilityState["Population Density"]) {
     worldPopLayer.addTo(map);
   }
-  if (layerVisibilityState["Global Rice"]) {
+  if (layerVisibilityState["Rice Harvest"]) {
     globalRiceLayer.addTo(map);
   }
   
@@ -266,14 +266,19 @@ function updateLayers(countryName, year, wmsUrl) {
   // Create overlays object
   const overlays = {
     "RAI Heatmap": raiLayer,
-    "World Population": worldPopLayer,
-    "Global Rice": globalRiceLayer
+    "Population Density": worldPopLayer,
+    "Rice Harvest": globalRiceLayer
   };
   
   // Create new layer control (it will automatically detect which layers are on the map)
   layerControl = L.control.layers(baseLayers, overlays).addTo(map);
   
-  return riceLayerName; // Return for use in queryWmsFeature
+  // Return layer information for querying
+  return {
+    rai: { name: riceLayerName, type: 'RAI', layer: raiLayer },
+    worldPop: { name: worldPopLayerName, type: 'World Population', layer: worldPopLayer },
+    globalRice: { name: globalRiceLayerName, type: 'Global Rice', layer: globalRiceLayer }
+  };
 }
 
 
@@ -307,48 +312,39 @@ function updateMapView(map, country) {
   }
 }
 
-function queryWmsFeature(map, wmsUrl, layerName, latlng, countryBounds) {
-  // Use a fixed high resolution and country bounds for consistent queries across zoom levels
-  // This ensures the same geographic location always maps to the same pixel position
+// Helper function to query a single WMS layer
+function querySingleLayer(wmsUrl, layerName, latlng, countryBounds) {
   const fixedWidth = 2000;
   const fixedHeight = 2000;
   
-  // Use country bounds instead of current map view bounds for consistency
-  const west = countryBounds[0][1];  // min longitude
-  const south = countryBounds[0][0];  // min latitude
-  const east = countryBounds[1][1];   // max longitude
-  const north = countryBounds[1][0];  // max latitude
+  const west = countryBounds[0][1];
+  const south = countryBounds[0][0];
+  const east = countryBounds[1][1];
+  const north = countryBounds[1][0];
   
   const bbox = west + ',' + south + ',' + east + ',' + north;
   
-  // Calculate the pixel position in the fixed resolution based on lat/lng
-  // Calculate pixel X based on longitude
   const pixelX = Math.round(((latlng.lng - west) / (east - west)) * fixedWidth);
-  
-  // Calculate pixel Y based on latitude (inverted because WMS uses bottom-left origin)
   const pixelY = Math.round(((north - latlng.lat) / (north - south)) * fixedHeight);
   
-  // Clamp pixel coordinates to valid range
   const x = Math.max(0, Math.min(fixedWidth - 1, pixelX));
   const y = Math.max(0, Math.min(fixedHeight - 1, pixelY));
   
   const url = wmsUrl + '?' + 
-  'SERVICE=WMS&' +
-  'VERSION=1.1.1&' +
-  'REQUEST=GetFeatureInfo&' +
-  'LAYERS=' + encodeURIComponent(layerName) + '&' +
-  'QUERY_LAYERS=' + encodeURIComponent(layerName) + '&' +
-  'STYLES=&' +
-  'BBOX=' + bbox + '&' +
-  'WIDTH=' + fixedWidth + '&' +
-  'HEIGHT=' + fixedHeight + '&' +
-  'SRS=EPSG:4326&' +
-  'FORMAT=image/png&' +
-  'INFO_FORMAT=application/json&' +
-  'X=' + x + '&' +
-  'Y=' + y;
-
-  console.log('GetFeatureInfo query:', { x, y, latlng, bbox, url });
+    'SERVICE=WMS&' +
+    'VERSION=1.1.1&' +
+    'REQUEST=GetFeatureInfo&' +
+    'LAYERS=' + encodeURIComponent(layerName) + '&' +
+    'QUERY_LAYERS=' + encodeURIComponent(layerName) + '&' +
+    'STYLES=&' +
+    'BBOX=' + bbox + '&' +
+    'WIDTH=' + fixedWidth + '&' +
+    'HEIGHT=' + fixedHeight + '&' +
+    'SRS=EPSG:4326&' +
+    'FORMAT=image/png&' +
+    'INFO_FORMAT=application/json&' +
+    'X=' + x + '&' +
+    'Y=' + y;
 
   return fetch(url)
     .then(response => {
@@ -357,47 +353,93 @@ function queryWmsFeature(map, wmsUrl, layerName, latlng, countryBounds) {
       }
       return response.json();
     })
-    .then(data => {
-      console.log('WMS GetFeatureInfo response:', data);
-      if (data.features && data.features.length > 0) {
-        const properties = data.features[0].properties;
-        let content = '<div style="font-size: 12px;">';
-        let hasValidData = false;
-        
-        for (let key in properties) {
-          const value = properties[key];
-          // Skip no-data values (-9999, null, undefined, NaN)
-          if (value !== null && value !== undefined && !isNaN(value) && value !== -9999 && value !== '-9999') {
-            content += `<div><b>RAI:</b> ${parseFloat(value).toFixed(3)}</div>`;
+    .catch(error => {
+      console.error(`Error querying layer ${layerName}:`, error);
+      return null;
+    });
+}
+
+function queryWmsFeature(map, wmsUrl, enabledLayers, latlng, countryBounds) {
+  // Query all enabled layers in parallel
+  const layerQueries = enabledLayers.map(layerInfo => 
+    querySingleLayer(wmsUrl, layerInfo.name, latlng, countryBounds)
+      .then(data => ({ layerInfo, data }))
+  );
+
+  Promise.all(layerQueries)
+    .then(results => {
+      let content = '<div style="font-size: 12px;">';
+      let hasValidData = false;
+      
+      results.forEach(({ layerInfo, data }) => {
+        if (data && data.features && data.features.length > 0) {
+          const properties = data.features[0].properties;
+          let layerHasData = false;
+          
+          for (let key in properties) {
+            const value = properties[key];
+            // Skip no-data values (-9999, null, undefined, NaN)
+            if (value !== null && value !== undefined && !isNaN(value) && value !== -9999 && value !== '-9999') {
+              const numValue = parseFloat(value);
+              
+              // Format based on layer type
+              if (layerInfo.type === 'RAI') {
+                // RAI as percentage
+                const percentage = (numValue).toFixed(2);
+                content += `<div><b>RAI:</b> ${percentage}%</div>`;
+                layerHasData = true;
+              } else if (layerInfo.type === 'World Population') {
+                // Population Density: People per pixel (PPL)
+                // Format as whole number since it represents count of people
+                const formattedValue = numValue >= 1000 
+                  ? numValue.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                  : numValue.toFixed(0);
+                content += `<div><b>Population Density:</b> ${formattedValue} people</div>`;
+                layerHasData = true;
+              } else if (layerInfo.type === 'Global Rice') {
+                // Rice Harvest: Metric tonnes (1,000 kg) per grid cell
+                // Format with appropriate precision for metric tonnes
+                let formattedValue;
+                if (numValue >= 1000000) {
+                  formattedValue = (numValue / 1000000).toFixed(2) + 'M tonnes';
+                } else if (numValue >= 1000) {
+                  formattedValue = (numValue / 1000).toFixed(2) + 'k tonnes';
+                } else {
+                  formattedValue = numValue.toFixed(2) + ' tonnes';
+                }
+                content += `<div><b>Rice Harvest:</b> ${formattedValue}</div>`;
+                layerHasData = true;
+              } else {
+                content += `<div><b>${layerInfo.type}:</b> ${numValue.toFixed(3)}</div>`;
+                layerHasData = true;
+              }
+            }
+          }
+          
+          if (layerHasData) {
             hasValidData = true;
           }
         }
-        
-        if (!hasValidData) {
-          content = '<div>No data at this location (no-data value)</div>';
-        }
-        content += '</div>';
-        
-        L.popup()
-          .setLatLng(latlng)
-          .setContent(content)
-          .openOn(map);
-      } else {
-        L.popup()
-          .setLatLng(latlng)
-          .setContent('<div>No data at this location</div>')
-          .openOn(map);
+      });
+      
+      if (!hasValidData) {
+        content = '<div>No data at this location (no-data value)</div>';
       }
-      return data;
+      content += '</div>';
+      
+      L.popup()
+        .setLatLng(latlng)
+        .setContent(content)
+        .openOn(map);
     })
     .catch(error => {
-      console.error('Error querying WMS:', error);
+      console.error('Error querying WMS layers:', error);
       L.popup()
         .setLatLng(latlng)
         .setContent('<div>Error retrieving data: ' + error.message + '</div>')
         .openOn(map);
     });
-  }
+}
 
 
 
@@ -481,7 +523,7 @@ d3.csv("master_dataset.csv").then(function(data){
 
       if (countryName) {
         // Update layers (this will preserve visibility state)
-        const layerName = updateLayers(countryName, year, wmsUrl);
+        const layerInfo = updateLayers(countryName, year, wmsUrl);
         
         // Update map view (center, zoom, bounds)
         updateMapView(map, countryName);
@@ -492,7 +534,26 @@ d3.csv("master_dataset.csv").then(function(data){
 
         if (countryBounds) {
           map.on('click', (e) => {
-            queryWmsFeature(map, wmsUrl, layerName, e.latlng, countryBounds);
+            // Get enabled layers (only query layers that are currently visible on the map)
+            const enabledLayers = [];
+            if (map.hasLayer(layerInfo.rai.layer) && layerInfo.rai.name) {
+              enabledLayers.push({ name: layerInfo.rai.name, type: layerInfo.rai.type });
+            }
+            if (map.hasLayer(layerInfo.worldPop.layer) && layerInfo.worldPop.name) {
+              enabledLayers.push({ name: layerInfo.worldPop.name, type: layerInfo.worldPop.type });
+            }
+            if (map.hasLayer(layerInfo.globalRice.layer) && layerInfo.globalRice.name) {
+              enabledLayers.push({ name: layerInfo.globalRice.name, type: layerInfo.globalRice.type });
+            }
+            
+            if (enabledLayers.length > 0) {
+              queryWmsFeature(map, wmsUrl, enabledLayers, e.latlng, countryBounds);
+            } else {
+              L.popup()
+                .setLatLng(e.latlng)
+                .setContent('<div>No layers enabled. Please enable at least one layer to query data.</div>')
+                .openOn(map);
+            }
           });
         }
       }
