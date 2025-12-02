@@ -1,6 +1,8 @@
 // Import modular right-panel (requires script to be loaded as type="module")
 import { RightPanel } from "./rightPanel/RightPanel.js";
 import { StackedPage } from "./rightPanel/StackedPage.js";
+//import { WorldPopPage } from "./rightPanel/WorldPopPage.js"; 
+
 
 // Initialize Leaflet map
 let map = null;
@@ -444,7 +446,15 @@ d3.csv("master_dataset.csv").then(function(data){
     } – ${year} – RAI: ${row ? row.National_RAI : "N/A"} – SSR: ${row ? row.SSR : "N/A"}`;
 
     // render right panel
-    rightPanel.load(StackedPage, { year: parseInt(year), data });
+    if(category === "generic_data")
+    {
+      rightPanel.load(StackedPage, { year: parseInt(year), data });
+    }
+    // else if(category === "world_pop")
+    // {
+    //   rightPanel.load(WorldPopPage, { year: parseInt(year), data });
+
+    // }
 
     // flag button listeners
     document.querySelectorAll(".country").forEach(btn => {
