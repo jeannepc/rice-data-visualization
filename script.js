@@ -1,7 +1,6 @@
 // Import modular right-panel (requires script to be loaded as type="module")
 import { RightPanel } from "./rightPanel/RightPanel.js";
 import { StackedPage } from "./rightPanel/StackedPage.js";
-//import { WorldPopPage } from "./rightPanel/WorldPopPage.js"; 
 
 
 // Initialize Leaflet map
@@ -346,6 +345,12 @@ d3.csv("master_dataset.csv").then(function(data){
     if (unique.size === 1) div.classList.add("active");
 
     flagBar.appendChild(div);
+
+    window.getFlagOrder = function() {
+      return Array.from(document.querySelectorAll(".country"))
+        .map(btn => btn.dataset.countryName);
+    };
+
   });
 
   // Initialize map once
@@ -455,6 +460,14 @@ d3.csv("master_dataset.csv").then(function(data){
     //   rightPanel.load(WorldPopPage, { year: parseInt(year), data });
 
     // }
+    if(window.stackedPageInfo) {
+      const colors = window.stackedPageInfo.colors;
+      document.querySelectorAll(".country").forEach(btn => {
+        const cname = btn.dataset.countryName;
+        btn.style.borderLeft = `8px solid ${colors[cname]}`;
+       
+      });
+    }
 
     // flag button listeners
     document.querySelectorAll(".country").forEach(btn => {

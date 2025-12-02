@@ -77,9 +77,25 @@ export const StackedPage = {
       };
     });
 
-    const countries = Object.values(countryMap)
-      .sort((a,b) => b.GDP_Per_Capita_USD - a.GDP_Per_Capita_USD)
-      .map(d => d.Country);
+    // const countries = Object.values(countryMap)
+    //   .sort((a,b) => b.GDP_Per_Capita_USD - a.GDP_Per_Capita_USD)
+    //   .map(d => d.Country);
+
+    let countries = [];
+    if (window.getFlagOrder) {
+      const flagOrder = window.getFlagOrder();
+      countries = flagOrder.filter(c => countryMap[c]);
+    } else {
+      countries = Object.keys(countryMap);
+    }
+
+    window.stackedPageInfo = {
+      order: countries,
+      colors: {}
+    };
+    countries.forEach((c, i) => {
+      window.stackedPageInfo.colors[c] = COLORS[i % COLORS.length];
+    });
 
     const margin = { top: 30, right: 20, bottom: 30, left: 140 };
     const rowHeight = 48;
