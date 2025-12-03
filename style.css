@@ -281,7 +281,7 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 64px;
+    font-size: 54px;
     font-weight: bold;
     color: lightgrey;
     pointer-events: none;
@@ -306,7 +306,7 @@ body {
   bottom: 40px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 24px;
+  font-size: 18px;
   color: #FFF;
   opacity: 0.8;
   pointer-events: none;
@@ -326,7 +326,7 @@ body {
 }
 
 #secondText {
-  font-size: 32px;
+  font-size: 24px;
   margin-bottom: 20px;
   text-align: center;
   color: lightgrey;
@@ -339,7 +339,7 @@ body {
   bottom: 40px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 24px;
+  font-size: 18px;
   opacity: 0.8;
   pointer-events: none;
   /* animation: blink 1.5s infinite; */
