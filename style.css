@@ -294,6 +294,8 @@ body {
   background: white;
   border-radius: 50%;
   border: 1px solid #e5e5e5;
+  width: 0.8vw;  /* relative to viewport width */
+  height: 0.4vw; /* relative to viewport width */
   transform: rotate(calc(var(--rand) * 1deg));
   pointer-events: none;
   transition: transform 0.1s linear;
@@ -341,4 +343,16 @@ body {
   opacity: 0.8;
   pointer-events: none;
   /* animation: blink 1.5s infinite; */
+}
+
+#pageFooter {
+  text-align: center;
+  padding: 15px 10px;
+  font-size: 0.9rem;
+  color: #FFF;
+  top: 25px;
+  /* border-top: 1px solid #ddd; */
+  /* background-color: #fafafa; optional subtle background */
+  position: relative; /* keeps it at the bottom of content */
+  margin-top: 30px;   /* spacing from main content */
 }
