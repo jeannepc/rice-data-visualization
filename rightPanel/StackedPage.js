@@ -28,8 +28,8 @@ const COLORS = [
 export const StackedPage = {
 
   render(parent, { year, data }) {
+    //<h3 style="text-align:center; margin-bottom:0px;">${year} metrics</h3>
     parent.innerHTML = `
-      <h3>Stacked dashboard — ${year}</h3>
       <div id="barChartContainer" style="margin-top:10px;"></div>
     `;
     this.renderStackedBarChart(year, data);
@@ -144,7 +144,7 @@ export const StackedPage = {
         .attr("y", y + rowHeight / 2)
         .attr("text-anchor", "end")
         .attr("dominant-baseline", "middle")
-        .style("font-size", "13px")
+        .style("font-size", "15px")
         .style("font-weight", "600")
         .style("fill", "#ffffff")
         .text(VARIABLE_LABLES[varName]);

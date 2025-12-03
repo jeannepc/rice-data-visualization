@@ -670,31 +670,58 @@ d3.csv("master_dataset.csv").then(function(data){
 
   const unique = new Set();
 
-  data.forEach((row, i) => {
-    const countryName = row.Country;
-    if (unique.has(countryName)) return;
-    unique.add(countryName);
+  // Hardcoded country array, sorted by continent area → country area
+  // I used ChatGPT to get the areas.
+  const countriesByArea = [
+    // North America
+    { name: "USA", continent: "North America", area: 9834000 },
 
-    const countryId = countryName.toLowerCase().replace(/ /g, "_");
+    // South America
+    { name: "Brazil", continent: "South America", area: 8516000 },
 
-    // Create a flag button
+    // Asia
+    { name: "China", continent: "Asia", area: 9597000 },
+    { name: "India", continent: "Asia", area: 3287000 },
+    { name: "Indonesia", continent: "Asia", area: 1905000 },
+    { name: "Pakistan", continent: "Asia", area: 881000 },
+    { name: "Myanmar", continent: "Asia", area: 676000 },
+    { name: "Thailand", continent: "Asia", area: 513000 },
+    { name: "Japan", continent: "Asia", area: 378000 },
+    { name: "Vietnam", continent: "Asia", area: 331000 },
+    { name: "Philippines", continent: "Asia", area: 300000 },
+    { name: "Laos", continent: "Asia", area: 237000 },
+    { name: "Cambodia", continent: "Asia", area: 181000 },
+    { name: "Bangladesh", continent: "Asia", area: 148000 },
+    { name: "Nepal", continent: "Asia", area: 147000 },
+    { name: "Sri Lanka", continent: "Asia", area: 66000 },
+
+    // Africa
+    { name: "Egypt", continent: "Africa", area: 1010000 },
+    { name: "Nigeria", continent: "Africa", area: 923000 },
+    { name: "Madagascar", continent: "Africa", area: 587000 },
+  ];
+
+
+  countriesByArea.forEach((country, i) => {
+    const countryId = country.name.toLowerCase().replace(/ /g, "_");
+
     const div = document.createElement("div");
     div.className = "country";
     div.dataset.country = countryId;
-    div.dataset.countryName = countryName; // Store the actual country name
-    div.textContent = countryName;
+    div.dataset.countryName = country.name;
+    div.textContent = country.name;
 
-    // Make the first one active by default
-    if (unique.size === 1) div.classList.add("active");
+    // Make first one active
+    if (i === 0) div.classList.add("active");
 
     flagBar.appendChild(div);
-
-    window.getFlagOrder = function() {
-      return Array.from(document.querySelectorAll(".country"))
-        .map(btn => btn.dataset.countryName);
-    };
-
   });
+
+  // Optional: get current button order
+  window.getFlagOrder = function() {
+    return Array.from(document.querySelectorAll(".country"))
+      .map(btn => btn.dataset.countryName);
+  };
 
   // Initialize map once
   const mapContainer = document.getElementById("map");
