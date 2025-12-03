@@ -247,7 +247,7 @@ body {
   #riceOverlay {
     position: fixed;
     inset: 0;
-    background: #1e293b;
+    background: #0f172a;
     z-index: 9999;
     overflow: hidden;
   }
@@ -257,7 +257,7 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 52px;
+    font-size: 64px;
     font-weight: bold;
     color: lightgrey;
     pointer-events: none;
@@ -282,6 +282,38 @@ body {
   transform: translateX(-50%);
   font-size: 24px;
   color: #FFF;
+  opacity: 0.8;
+  pointer-events: none;
+  /* animation: blink 1.5s infinite; */
+}
+
+#secondOverlay {
+  position: fixed;
+  inset: 0;
+  padding: 100px;
+  background: #0f172a;
+  z-index: 9998;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+
+#secondText {
+  font-size: 32px;
+  margin-bottom: 20px;
+  text-align: center;
+  color: lightgrey;
+  bottom: 40px;
+}
+
+#secondClick {
+  color: #FFF;
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 24px;
   opacity: 0.8;
   pointer-events: none;
   /* animation: blink 1.5s infinite; */

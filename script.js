@@ -959,8 +959,20 @@ function startRiceEffect() {
   });
 
   // Click to remove overlay
-  overlay.addEventListener("click", () => {
-    overlay.style.opacity = "0";
-    setTimeout(() => overlay.remove(), 300);
-  });
+overlay.addEventListener("click", () => {
+  overlay.remove();  // instantly remove rice screen
+
+  // Show second screen
+  const second = document.getElementById("secondOverlay");
+  second.style.display = "flex";
+});
+
+
+const second = document.getElementById("secondOverlay");
+
+second.addEventListener("click", () => {
+  second.remove();   // instantly remove second screen
+  // User now sees the main index.html content
+});
+
 }
