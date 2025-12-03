@@ -932,7 +932,7 @@ document.addEventListener("DOMContentLoaded", () => {
 function startRiceEffect() {
   const overlay = document.getElementById("riceOverlay");
 
-  const RICE_COUNT = 5000;  // ⬅️ doubled for more coverage
+  const RICE_COUNT = 2500;  // ⬅️ doubled for more coverage
   const riceElements = [];
   const radius = 70;         // slightly larger brush radius
 
