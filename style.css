@@ -243,3 +243,46 @@ body {
   color: #93c5fd;
 }
 
+
+  #riceOverlay {
+    position: fixed;
+    inset: 0;
+    background: #1e293b;
+    z-index: 9999;
+    overflow: hidden;
+  }
+
+  #hiddenText {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 52px;
+    font-weight: bold;
+    color: lightgrey;
+    pointer-events: none;
+  }
+
+ .rice {
+  position: absolute;
+  width: 12px;
+  height: 6px;
+  background: white;
+  border-radius: 50%;
+  border: 1px solid #e5e5e5;
+  transform: rotate(calc(var(--rand) * 1deg));
+  pointer-events: none;
+  transition: transform 0.1s linear;
+}
+
+#clickToContinue {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 24px;
+  color: #FFF;
+  opacity: 0.8;
+  pointer-events: none;
+  /* animation: blink 1.5s infinite; */
+}

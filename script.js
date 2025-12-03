@@ -897,3 +897,70 @@ d3.csv("master_dataset.csv").then(function(data){
   const rightPanel = document.getElementById("rightPanel");
   if (rightPanel) rightPanel.innerHTML = "<div style='color:red;'>Failed to load master_dataset.csv</div>";
 });
+
+document.addEventListener("DOMContentLoaded", () => {
+  startRiceEffect();
+});
+
+function startRiceEffect() {
+  const overlay = document.getElementById("riceOverlay");
+
+  const RICE_COUNT = 5000;  // ⬅️ doubled for more coverage
+  const riceElements = [];
+  const radius = 70;         // slightly larger brush radius
+
+  function createRice() {
+      const NO_RICE_HEIGHT = 100; // <-- bottom area to avoid
+
+    for (let i = 0; i < RICE_COUNT; i++) {
+      const rice = document.createElement("div");
+      rice.classList.add("rice");
+
+      // Starting positions
+      rice.x = Math.random() * window.innerWidth;
+    rice.y = Math.random() * (window.innerHeight - NO_RICE_HEIGHT);
+
+      rice.style.left = rice.x + "px";
+      rice.style.top = rice.y + "px";
+
+      // We track the rice's current pushed offset
+      rice.offsetX = 0;
+      rice.offsetY = 0;
+
+      overlay.appendChild(rice);
+      riceElements.push(rice);
+    }
+  }
+
+  createRice();
+
+  // Brush: push rice permanently
+  document.addEventListener("mousemove", (e) => {
+    const mx = e.clientX;
+    const my = e.clientY;
+
+    riceElements.forEach((rice) => {
+      const dx = rice.x + rice.offsetX - mx;
+      const dy = rice.y + rice.offsetY - my;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < radius) {
+        const angle = Math.atan2(dy, dx);
+        const pushDist = (radius - dist) * 0.9;
+
+        // Update permanent offset
+        rice.offsetX += Math.cos(angle) * pushDist;
+        rice.offsetY += Math.sin(angle) * pushDist;
+
+        // Apply transform
+        rice.style.transform = `translate(${rice.offsetX}px, ${rice.offsetY}px)`;
+      }
+    });
+  });
+
+  // Click to remove overlay
+  overlay.addEventListener("click", () => {
+    overlay.style.opacity = "0";
+    setTimeout(() => overlay.remove(), 300);
+  });
+}
