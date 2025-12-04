@@ -6,145 +6,152 @@ import { StackedPage } from "./rightPanel/StackedPage.js";
 // Initialize Leaflet map
 let map = null;
 const countryViewConfig = {
+  Global: {
+    center: [0, 0],
+    zoom: 2,
+    minZoom: 1,
+    maxZoom: 10,
+    bounds: [[-90, -180], [90, 180]]
+  },
   China: { 
     center: [35.8617, 104.1954], 
-    zoom: 4, 
+    zoom: 3, 
     minZoom: 3, 
     maxZoom: 8,
     bounds: [[18.0, 73.0], [53.0, 135.0]]
   },
   India: { 
     center: [20.5937, 78.9629], 
-    zoom: 5, 
+    zoom: 4, 
     minZoom: 4, 
     maxZoom: 9,
     bounds: [[6.0, 68.0], [37.0, 97.0]]
   },
   Indonesia: { 
     center: [-0.7893, 113.9213], 
-    zoom: 5, 
+    zoom: 4, 
     minZoom: 4, 
     maxZoom: 9,
     bounds: [[-11.0, 95.0], [6.0, 141.0]]
   },
   Bangladesh: { 
     center: [23.6850, 90.3563], 
-    zoom: 7, 
+    zoom: 6, 
     minZoom: 6, 
     maxZoom: 11,
     bounds: [[20.0, 88.0], [27.0, 93.0]]
   },
   Vietnam: { 
     center: [14.0583, 108.2772], 
-    zoom: 6, 
+    zoom: 5, 
     minZoom: 5, 
     maxZoom: 10,
     bounds: [[8.0, 102.0], [23.0, 110.0]]
   },
   Thailand: { 
     center: [15.8700, 100.9925], 
-    zoom: 6, 
+    zoom: 5, 
     minZoom: 5, 
     maxZoom: 10,
     bounds: [[5.0, 97.0], [21.0, 106.0]]
   },
   Myanmar: { 
     center: [21.9162, 95.9560], 
-    zoom: 6, 
+    zoom: 5, 
     minZoom: 5, 
     maxZoom: 10,
     bounds: [[9.0, 92.0], [29.0, 102.0]]
   },
   Philippines: { 
     center: [12.8797, 121.7740], 
-    zoom: 6, 
+    zoom: 5, 
     minZoom: 5, 
     maxZoom: 10,
     bounds: [[4.0, 116.0], [21.0, 127.0]]
   },
   Pakistan: { 
     center: [30.3753, 69.3451], 
-    zoom: 6, 
+    zoom: 5, 
     minZoom: 5, 
     maxZoom: 10,
     bounds: [[23.0, 60.0], [37.0, 78.0]]
   },
   Japan: { 
     center: [36.2048, 138.2529], 
-    zoom: 6, 
+    zoom: 5, 
     minZoom: 5, 
     maxZoom: 10,
     bounds: [[24.0, 123.0], [46.0, 146.0]]
   },
   Cambodia: { 
     center: [12.5657, 104.9910], 
-    zoom: 7, 
+    zoom: 6, 
     minZoom: 6, 
     maxZoom: 11,
     bounds: [[10.0, 102.0], [15.0, 108.0]]
   },
   Laos: { 
     center: [19.8563, 102.4955], 
-    zoom: 7, 
+    zoom: 6, 
     minZoom: 6, 
     maxZoom: 11,
     bounds: [[13.0, 100.0], [23.0, 108.0]]
   },
   "Sri Lanka": { 
     center: [7.8731, 80.7718], 
-    zoom: 7, 
+    zoom: 6, 
     minZoom: 6, 
     maxZoom: 11,
     bounds: [[5.0, 79.0], [10.0, 82.0]]
   },
   Nepal: { 
     center: [28.3949, 84.1240], 
-    zoom: 7, 
+    zoom: 6, 
     minZoom: 6, 
     maxZoom: 11,
     bounds: [[26.0, 80.0], [31.0, 89.0]]
   },
   "South Korea": { 
     center: [35.9078, 127.7669], 
-    zoom: 7, 
+    zoom: 6, 
     minZoom: 6, 
     maxZoom: 11,
     bounds: [[33.0, 124.0], [39.0, 132.0]]
   },
   Nigeria: { 
     center: [9.0820, 8.6753], 
-    zoom: 6, 
+    zoom: 5, 
     minZoom: 5, 
     maxZoom: 10,
     bounds: [[4.0, 2.0], [14.0, 15.0]]
   },
   Madagascar: { 
     center: [-18.7669, 46.8691], 
-    zoom: 6, 
+    zoom: 5, 
     minZoom: 5, 
     maxZoom: 10,
     bounds: [[-26.0, 43.0], [-11.0, 51.0]]
   },
   Egypt: { 
     center: [26.8206, 30.8025], 
-    zoom: 6, 
+    zoom: 5, 
     minZoom: 5, 
     maxZoom: 10,
     bounds: [[22.0, 24.0], [32.0, 37.0]]
   },
   Brazil: { 
     center: [-14.2350, -51.9253], 
-    zoom: 4, 
+    zoom: 3, 
     minZoom: 3, 
     maxZoom: 8,
     bounds: [[-34.0, -74.0], [6.0, -32.0]]
   },
   USA: { 
     center: [37.0902, -95.7129], 
-    zoom: 4, 
+    zoom: 3, 
     minZoom: 3, 
     maxZoom: 8,
-    bounds: [[24.0, -125.0], [50.0, -66.0]]
+    bounds: [[19.0, -180.0], [71.0, -65.0]]
   }
 };
 
@@ -197,17 +204,28 @@ function updateLayers(countryName, year, wmsUrl) {
   
   // Remove old legend event listeners
   map.off('overlayadd overlayremove', updateLegend);
+
+  // For "Global", use global layer names (without country name prefix)
+  let riceLayerName, worldPopLayerName, globalRiceLayerName;
   
   // Create new layer names based on current country and year
-  const riceLayerName = countryName
-    ? `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year}_rai`
-    : null;
-  const worldPopLayerName = countryName
-    ? `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year}_pop_10km_aligned`
-    : null;
-  const globalRiceLayerName = countryName
-    ? `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year}_rice_10km`
-    : null;
+  if (countryName === "Global") {
+    // Global layers - adjust these if your WMS server uses different naming
+    // Common patterns: rice:global_${year}_rai, rice:${year}_rai_global, or rice:rai_${year}
+    riceLayerName = `rice:global_${year}_rai`;
+    worldPopLayerName = `rice:global_${year}_pop_10km_aligned`;
+    globalRiceLayerName = `rice:global_${year}_rice_10km`;
+  }
+  else if (countryName) {
+    riceLayerName = `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year}_rai`;
+    worldPopLayerName = `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year}_pop_10km_aligned`;
+    globalRiceLayerName = `rice:${countryName.toLowerCase().replace(/ /g, "_")}_${year}_rice_10km`;
+  } 
+  else {
+    riceLayerName = null;
+    worldPopLayerName = null;
+    globalRiceLayerName = null;
+  }
   
   // Create new layers
   raiLayer = L.tileLayer.wms(wmsUrl, {
@@ -497,7 +515,10 @@ function updateMapView(map, country) {
     map.setMaxZoom(config.maxZoom);
     
     // Set bounding box to restrict panning to country area
-    if (config.bounds) {
+    // Skip bounds for Global view to allow free panning
+    if (country === "Global") {
+      map.setMaxBounds(null); // Remove bounds restriction for global view
+    } else if (config.bounds) {
       const bounds = L.latLngBounds(config.bounds);
       map.setMaxBounds(bounds);
     }
@@ -668,6 +689,14 @@ d3.csv("master_dataset.csv").then(function(data){
 
   const flagBar = document.getElementById("flagBar");
 
+  // Add "Global" as the first option and make it active by default
+  const globalDiv = document.createElement("div");
+  globalDiv.className = "country active";
+  globalDiv.dataset.country = "global";
+  globalDiv.dataset.countryName = "Global";
+  globalDiv.textContent = "Global";
+  flagBar.appendChild(globalDiv);
+
   const unique = new Set();
 
   // Hardcoded country array, sorted by continent area → country area
@@ -709,11 +738,8 @@ d3.csv("master_dataset.csv").then(function(data){
     const div = document.createElement("div");
     div.className = "country";
     div.dataset.country = countryId;
-    div.dataset.countryName = country.name;
+    div.dataset.countryName = country.name; // Store the actual country name
     div.textContent = country.name;
-
-    // Make first one active
-    if (i === 0) div.classList.add("active");
 
     flagBar.appendChild(div);
   });
@@ -802,35 +828,45 @@ d3.csv("master_dataset.csv").then(function(data){
       header = document.createElement("h3");
       leftPanel.insertBefore(header, mapContainer);
     }
-    const row = data.find(r => r.Country === countryName && String(r.Year) === String(year));
-    const raiValue = row ? row.National_RAI : "N/A";
-    const ssrValue = row ? row.SSR : "N/A";
-    
-    header.innerHTML = `Average RAI: ${raiValue}%<span class="tooltip-trigger" data-tooltip="rai">ℹ️<span class="tooltip-content"><h4>Rice Accessibility Index (RAI)</h4><p>Measures whether rice produced within 50km of each location can meet local consumption needs.</p><ul><li><strong>100%</strong> = Local production meets local demand</li><li><strong>&gt;100%</strong> = Surplus production nearby</li><li><strong>&lt;100%</strong> = Insufficient local production</li></ul><p>This reveals vulnerabilities in the food system even when national production seems adequate. Urban areas often show low RAI due to geographic separation from rural production zones.</p></span></span> – SSR: ${ssrValue}%<span class="tooltip-trigger" data-tooltip="ssr">ℹ️<span class="tooltip-content"><h4>Self-Sufficiency Ratio (SSR)</h4><p>Measures whether a country's total rice production can meet its total national consumption needs.</p><ul><li><strong>100%</strong> = National production meets national demand</li><li><strong>&gt;100%</strong> = Net exporter (produces surplus)</li><li><strong>&lt;100%</strong> = Import dependent (production deficit)</li></ul><p>This shows overall national food security but doesn't reveal regional vulnerabilities or supply chain risks within the country.</p></span></span>`;
+    // For Global view, don't show country-specific metrics
+    if (countryName === "Global") {
+      header.innerHTML = `Global Overview – ${year} <span style="color: #94a3b8; font-size: 0.9em;">(Click on map to view data)</span>`;
+    } else {
+      const row = data.find(r => r.Country === countryName && String(r.Year) === String(year));
+      const raiValue = row ? row.National_RAI : "N/A";
+      const ssrValue = row ? row.SSR : "N/A";
+      
+      header.innerHTML = `Heatmap for ${
+        countryName ? countryName.toUpperCase() : "—"
+      } – ${year} – RAI: ${raiValue}%<span class="tooltip-trigger" data-tooltip="rai">ℹ️<span class="tooltip-content"><h4>Rice Accessibility Index (RAI)</h4><p>Measures whether rice produced within 50km of each location can meet local consumption needs.</p><ul><li><strong>100%</strong> = Local production meets local demand</li><li><strong>&gt;100%</strong> = Surplus production nearby</li><li><strong>&lt;100%</strong> = Insufficient local production</li></ul><p>This reveals vulnerabilities in the food system even when national production seems adequate. Urban areas often show low RAI due to geographic separation from rural production zones.</p></span></span> – SSR: ${ssrValue}%<span class="tooltip-trigger" data-tooltip="ssr">ℹ️<span class="tooltip-content"><h4>Self-Sufficiency Ratio (SSR)</h4><p>Measures whether a country's total rice production can meet its total national consumption needs.</p><ul><li><strong>100%</strong> = National production meets national demand</li><li><strong>&gt;100%</strong> = Net exporter (produces surplus)</li><li><strong>&lt;100%</strong> = Import dependent (production deficit)</li></ul><p>This shows overall national food security but doesn't reveal regional vulnerabilities or supply chain risks within the country.</p></span></span>`;
+    }
 
-    // Add click handlers for tooltips
-    header.querySelectorAll('.tooltip-trigger').forEach(trigger => {
-      trigger.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // Close all other tooltips
-        header.querySelectorAll('.tooltip-trigger').forEach(t => {
-          if (t !== trigger) {
-            t.classList.remove('active');
-          }
+    // Add click handlers for tooltips (only if tooltips exist)
+    const tooltipTriggers = header.querySelectorAll('.tooltip-trigger');
+    if (tooltipTriggers.length > 0) {
+      tooltipTriggers.forEach(trigger => {
+        trigger.addEventListener('click', (e) => {
+          e.stopPropagation();
+          // Close all other tooltips
+          tooltipTriggers.forEach(t => {
+            if (t !== trigger) {
+              t.classList.remove('active');
+            }
+          });
+          // Toggle current tooltip
+          trigger.classList.toggle('active');
         });
-        // Toggle current tooltip
-        trigger.classList.toggle('active');
       });
-    });
 
-    // Close tooltips when clicking outside
-    document.addEventListener('click', (e) => {
-      if (!header.contains(e.target)) {
-        header.querySelectorAll('.tooltip-trigger').forEach(trigger => {
-          trigger.classList.remove('active');
-        });
-      }
-    });
+      // Close tooltips when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!header.contains(e.target)) {
+          tooltipTriggers.forEach(trigger => {
+            trigger.classList.remove('active');
+          });
+        }
+      });
+    }
 
     // render right panel
     if(category === "generic_data")
