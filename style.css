@@ -2,7 +2,7 @@ body {
   font-family: Arial, sans-serif;
   background: #0f172a;
   color: white;
-  padding: 40px;
+  padding: 40px 40px 40px 0px;
 }
 
 /* Content boxes */
@@ -360,7 +360,7 @@ body {
   /* padding: 15px 10px; */
   font-size: 0.9rem;
   color: #FFF;
-  top: 25px;
+  /* top: 25px; */
   /* border-top: 1px solid #ddd; */
   /* background-color: #fafafa; optional subtle background */
   position: relative; /* keeps it at the bottom of content */
