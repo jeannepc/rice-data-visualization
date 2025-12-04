@@ -693,6 +693,7 @@ d3.csv("master_dataset.csv").then(function(data){
     { name: "Cambodia", continent: "Asia", area: 181000 },
     { name: "Bangladesh", continent: "Asia", area: 148000 },
     { name: "Nepal", continent: "Asia", area: 147000 },
+    { name: "South Korea", continent: "Asia", area: 100000},
     { name: "Sri Lanka", continent: "Asia", area: 66000 },
 
     // Africa
