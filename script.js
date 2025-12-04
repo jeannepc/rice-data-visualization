@@ -615,11 +615,12 @@ function queryWmsFeature(map, wmsUrl, enabledLayers, latlng, countryBounds) {
                 content += `<div><b>RAI:</b> ${percentage}%</div>`;
                 layerHasData = true;
               } else if (layerInfo.type === 'World Population') {
-                // Population Density: People per pixel (PPL)
-                // Format as whole number since it represents count of people
-                const formattedValue = numValue >= 1000 
-                  ? numValue.toLocaleString('en-US', { maximumFractionDigits: 0 })
-                  : numValue.toFixed(0);
+                // Population Density: Values are in thousands of people per grid cell
+                // Scale the value by 1000 to get actual population count
+                const actualPopulation = numValue * 1000;
+                const formattedValue = actualPopulation >= 1000
+                  ? actualPopulation.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                  : actualPopulation.toFixed(0);
                 content += `<div><b>Population Density:</b> ${formattedValue} people</div>`;
                 layerHasData = true;
               } else if (layerInfo.type === 'Global Rice') {
