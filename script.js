@@ -851,7 +851,8 @@ d3.csv("master_dataset.csv").then(function(data){
        
       });
     }
-
+    
+  
     // flag button listeners
     document.querySelectorAll(".country").forEach(btn => {
       btn.onclick = () => {
@@ -867,6 +868,14 @@ d3.csv("master_dataset.csv").then(function(data){
         }
 
         window.updatePanels();
+
+        setTimeout(() => {
+          if (window.sharedState.highlightedCountry && window.stackedLabelHelpers) {
+            window.stackedLabelHelpers.updateAllLabelsForCountry(
+              window.sharedState.highlightedCountry
+            );
+          }
+        }, 50);
       };
     });
 

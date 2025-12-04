@@ -25,6 +25,16 @@ const COLORS = [
   "#3182bd","#e6550d","#31a354","#756bb1","#636363"
 ];
 
+// Units for each variable
+const unitMap = {
+  GDP_Per_Capita_USD: "USD per person",
+  National_RAI: "RAI",
+  Mean_RAI: "RAI",
+  Total_Production_tonnes_paddy: "tonnes",
+  Total_Population: "people",
+  Per_Capita_Consumption_kg: "kg per person"
+};
+
 export const StackedPage = {
 
   render(parent, { year, data }) {
@@ -97,9 +107,9 @@ export const StackedPage = {
       window.stackedPageInfo.colors[c] = COLORS[i % COLORS.length];
     });
 
-    const margin = { top: 30, right: 20, bottom: 30, left: 140 };
+    const margin = { top: 30, right: 20, bottom: 30, left: 30 };
     const rowHeight = 48;
-    const rowGap = 14;
+    const rowGap = 22;
     const innerWidth = Math.max(700, countries.length * 6);
     const width = innerWidth + margin.left + margin.right;
     const height = margin.top + VARIABLE_OPTIONS.length * rowHeight + (VARIABLE_OPTIONS.length - 1) * rowGap + margin.bottom;
@@ -134,18 +144,56 @@ export const StackedPage = {
       });
     });
 
+    
     const rowGroup = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
     const labels = svg.append("g").attr("transform", `translate(${margin.left - 10},${margin.top})`);
 
+    // new stuff ---------------------------------------------------------------------------------------------
+    function updateAllLabelsForCountry(countryName) {
+      VARIABLE_OPTIONS.forEach((varName, rowIndex) => {
+        const raw = countryMap[countryName][varName];
+        const display = (raw === null || raw === undefined || isNaN(raw))
+          ? "N/A"
+          : raw.toLocaleString();
+
+          const unit = unitMap[varName] || "";
+
+        d3.select(`#label-${rowIndex}`)
+          .text(`${VARIABLE_LABLES[varName]}: ${display} ${unit}`);
+      });
+    }
+
+    function resetAllLabels() {
+      VARIABLE_OPTIONS.forEach((varName, rowIndex) => {
+        d3.select(`#label-${rowIndex}`).text(VARIABLE_LABLES[varName]);
+      });
+    }
+
+    window.stackedLabelHelpers = {
+      updateAllLabelsForCountry,
+      resetAllLabels
+    }
+    // end new stuff ---------------------------------------------------------------------------------------------
+
+
     VARIABLE_OPTIONS.forEach((varName, rowIndex) => {
       const y = rowIndex * (rowHeight + rowGap);
+      // labels.append("text")
+      //   .attr("x", -10)
+      //   .attr("y", y + rowHeight / 2)
+      //   .attr("text-anchor", "end")
+      //   .attr("dominant-baseline", "middle")
+      //   .style("font-size", "15px")
+      //   .style("font-weight", "600")
+      //   .style("fill", "#ffffff")
+      //   .text(VARIABLE_LABLES[varName]);
       labels.append("text")
-        .attr("x", -10)
-        .attr("y", y + rowHeight / 2)
-        .attr("text-anchor", "end")
-        .attr("dominant-baseline", "middle")
+        .attr("id", `label-${rowIndex}`)
+        .attr("x", 10)
+        .attr("y", y - 6)
+        .attr("text-anchor", "front")
         .style("font-size", "15px")
-        .style("font-weight", "600")
+        .style("front-weight", "600")
         .style("fill", "#ffffff")
         .text(VARIABLE_LABLES[varName]);
     });
@@ -173,91 +221,58 @@ export const StackedPage = {
 
           // === Mouseover ===
           .on("mouseover", function(event, d) {
-
             const raw = countryMap[d.country][d.variable];
-
             const formatted = (raw === undefined || raw === null || isNaN(raw))
-
               ? "N/A"
-
               : raw;
 
-
-
-            // Units for each variable
-
-            const unitMap = {
-
-              GDP_Per_Capita_USD: "USD per person",
-
-              National_RAI: "RAI",
-
-              Mean_RAI: "RAI",
-
-              Total_Production_tonnes_paddy: "tonnes",
-
-              Total_Population: "people",
-
-              Per_Capita_Consumption_kg: "kg per person"
-
-            };
-
-
+            
 
             const unit = unitMap[d.variable] || "";
 
-
-
             tooltip.style("opacity", 1)
-
               .html(`
-
                 <strong>${d.country}</strong><br/>
-
                 ${formatted} ${unit}
-
               `);
+            
+          
+            // let html = `<strong>${d.country}</strong><br/>`;
 
+            // VARIABLE_OPTIONS.forEach(v => {
+            //   const val = countryMap[d.country][v];
+            //   const label = VARIABLE_LABLES[v];
 
+            //   let display = (val === null || val === undefined || isNaN(val))
+            //     ? "N/A" : val.toLocaleString();
+
+            //     html += `${label}: ${display}<br/>`;
+            // });
+
+            // tooltip.style("opacity", 1).html(html);
 
             const marginRight = 10;
-
             const viewportWidth = window.styleinnerWidth || 
-
               document.documentElement.clientWidth;  
-
-
-
             const tooltipWidth = tooltip.node ? tooltip.node.offsetWidth : 150;
 
-
-
             let tx = event.pageX + 12;
-
             let ty = event.pageY + 12;
-
-
-
             if (tx + tooltipWidth + marginRight > viewportWidth)
-
             {
-
               tx = event.pageX - tooltipWidth - 12;
-
               if (tx < 8) tx = 8;
-
             }
 
-
-
             tooltip.style("left", tx + "px")
-
                   .style("top", ty + "px");
 
             if (!window.sharedState.highlightedCountry) {
               d3.selectAll(".stack-seg")
                 .attr("opacity", s => s.country === d.country ? 1 : 0.2);
             }
+
+            
           })
 
           .on("mousemove", function(event) {
@@ -265,25 +280,16 @@ export const StackedPage = {
           // Mirror the same flipping logic on mousemove
 
           const marginRight = 10;
-
           const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
-
           const tooltipNode = tooltip.node();
-
           const tooltipWidth = tooltipNode ? tooltipNode.offsetWidth : 150;
 
-
-
           let tx = event.pageX + 12;
-
           let ty = event.pageY + 12;
 
           if (tx + tooltipWidth + marginRight > viewportWidth) {
-
             tx = event.pageX - tooltipWidth - 12;
-
             if (tx < 8) tx = 8;
-
           }
 
           tooltip.style("left", tx + "px").style("top", ty + "px");
@@ -291,26 +297,44 @@ export const StackedPage = {
         })
 
           // === Mouseout ===
-          .on("mouseout", function() {
+          .on("mouseout", function(event, d) {
             tooltip.style("opacity", 0);
+            
 
             if (!window.sharedState.highlightedCountry) {
               d3.selectAll(".stack-seg").attr("opacity", 1);
             } else {
               window.applyHighlightState();
             }
+
+            if(d && typeof d.rowIndex !== "undefined")
+            {
+              d3.select(`label-${d.rowIndex}`)
+              .text(VARIABLE_LABLES[d.variable]);
+            }
           })
 
           // === Click ===
           .on("click", function(event, d) {
 
-            if (window.sharedState.highlightedCountry === d.country) {
-              window.sharedState.highlightedCountry = null;
-            } else {
-              window.sharedState.highlightedCountry = d.country;   // FIXED
-            }
+            const wasHighlighted = window.sharedState.highlightedCountry === d.country;
+            // if (window.sharedState.highlightedCountry === d.country) {
+            //   window.sharedState.highlightedCountry = null;
+            // } else {
+            //   window.sharedState.highlightedCountry = d.country;
+            // }
 
-            window.applyHighlightState();
+            // window.applyHighlightState();
+            window.sharedState.setHighlighted(wasHighlighted ? null : d.country);
+
+            if(wasHighlighted) 
+            {
+              resetAllLabels();
+            }
+            else
+            {
+              updateAllLabelsForCountry(d.country);
+            }
 
             // activate flag button
             document.querySelectorAll('.country').forEach(btn => {
@@ -319,8 +343,28 @@ export const StackedPage = {
 
             // refresh map + header
             if (window.updatePanels) {
-              setTimeout(() => window.updatePanels(), 50);
+              setTimeout(() => {
+                window.updatePanels();
+                if(!wasHighlighted) 
+                {
+                  updateAllLabelsForCountry(d.country);
+                }
+              }, 50);
             }
+
+            // const val = countryMap[d.country][d.variable];
+            // const formattedVal = (val === null || val === "undefined" || isNaN(val))
+            //   ? "N/A"
+            //   : val.toLocaleString();
+            
+            // d3.select(`#label-${d.rowIndex}`)
+            //   .text(`${VARIABLE_LABLES[d.variable]}: $formattedVal}`);
+
+            // VARIABLE_OPTIONS.forEach((varName, idx) => {
+            //   if(idx !== d.rowIndex) {
+            //     d3.select(`#label-${idx}`).text(VARIABLE_LABLES[varName]);
+            //   }
+            // });
           });
 
       });
